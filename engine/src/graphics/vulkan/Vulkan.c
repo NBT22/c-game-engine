@@ -2,9 +2,24 @@
 // Created by Noah on 7/5/2024.
 //
 
-#include <engine/graphics/vulkan/Vulkan.h>
 #include <assert.h>
 #include <cglm/types.h>
+#include <engine/assets/AssetReader.h>
+#include <engine/assets/ModelLoader.h>
+#include <engine/assets/TextureLoader.h>
+#include <engine/graphics/Drawing.h>
+#include <engine/graphics/vulkan/Vulkan.h>
+#include <engine/graphics/vulkan/VulkanActors.h>
+#include <engine/graphics/vulkan/VulkanHelpers.h>
+#include <engine/graphics/vulkan/VulkanInternal.h>
+#include <engine/graphics/vulkan/VulkanResources.h>
+#include <engine/helpers/MathEx.h>
+#include <engine/structs/Camera.h>
+#include <engine/structs/Color.h>
+#include <engine/structs/Level.h>
+#include <engine/structs/Viewmodel.h>
+#include <engine/subsystem/Logging.h>
+#include <engine/subsystem/threads/LodThread.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
 #include <luna/lunaBuffer.h>
@@ -21,21 +36,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan_core.h>
-#include <engine/structs/Camera.h>
-#include <engine/structs/Color.h>
-#include <engine/structs/Level.h>
-#include <engine/structs/Viewmodel.h>
-#include <engine/assets/ModelLoader.h>
-#include <engine/assets/TextureLoader.h>
-#include <engine/assets/AssetReader.h>
-#include <engine/subsystem/Logging.h>
-#include <engine/helpers/MathEx.h>
-#include <engine/graphics/Drawing.h>
-#include <engine/subsystem/threads/LodThread.h>
-#include <engine/graphics/vulkan/VulkanActors.h>
-#include <engine/graphics/vulkan/VulkanHelpers.h>
-#include <engine/graphics/vulkan/VulkanInternal.h>
-#include <engine/graphics/vulkan/VulkanResources.h>
 #ifdef JPH_DEBUG_RENDERER
 #include <engine/debug/JoltDebugRenderer.h>
 #include <engine/subsystem/Error.h>
@@ -56,7 +56,8 @@ bool VK_Init(SDL_Window *window)
 
 		VulkanActorsVariablesInit();
 
-		const VkPhysicalDeviceProperties physicalDeviceProperties = lunaGetPhysicalDeviceProperties();
+		VkPhysicalDeviceProperties physicalDeviceProperties;
+		lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
 		char vendor[32] = {};
 		switch (physicalDeviceProperties.vendorID)
 		{
@@ -160,11 +161,12 @@ VkResult VK_FrameStart()
 		return VK_ERROR_UNKNOWN;
 	}
 
+	VulkanTestResizeSwapchain(lunaBeginFrame(false), "Failed to begin frame!");
 	const LunaRenderPassBeginInfo beginInfo = {
 		.renderArea.extent = swapChainExtent,
 		.depthAttachmentClearValue.depthStencil.depth = 1,
 	};
-	VulkanTestResizeSwapchain(lunaBeginRenderPass(renderPass, &beginInfo), "Failed to begin render pass!");
+	VulkanTest(lunaBeginRenderPass(renderPass, &beginInfo), "Failed to begin render pass!");
 
 	if (UnlockLodThreadMutex() != 0)
 	{
@@ -528,8 +530,18 @@ VkResult VK_FrameEnd()
 	}
 	if (buffers.ui.indices.bytesUsed > 0)
 	{
-		lunaWriteDataToBuffer(buffers.ui.vertices.buffer, buffers.ui.vertices.data, buffers.ui.vertices.bytesUsed, 0);
-		lunaWriteDataToBuffer(buffers.ui.indices.buffer, buffers.ui.indices.data, buffers.ui.indices.bytesUsed, 0);
+		const LunaBufferWriteInfo vertexBufferWriteInfo = {
+			.bytes = buffers.ui.vertices.bytesUsed,
+			.data = buffers.ui.vertices.data,
+			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		};
+		const LunaBufferWriteInfo indexBufferWriteInfo = {
+			.bytes = buffers.ui.indices.bytesUsed,
+			.data = buffers.ui.indices.data,
+			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		};
+		lunaWriteDataToBuffer(buffers.ui.vertices.buffer, &vertexBufferWriteInfo);
+		lunaWriteDataToBuffer(buffers.ui.indices.buffer, &indexBufferWriteInfo);
 	}
 
 	if (LockLodThreadMutex() != 0)
@@ -587,7 +599,7 @@ VkResult VK_FrameEnd()
 
 	lunaEndRenderPass();
 
-	VulkanTestResizeSwapchain(lunaPresentSwapchain(), "Failed to present swapchain!");
+	VulkanTestResizeSwapchain(lunaEndFrame(), "Failed to present swapchain!");
 	if (UnlockLodThreadMutex() != 0)
 	{
 		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());

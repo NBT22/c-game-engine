@@ -2,10 +2,23 @@
 // Created by Noah on 11/23/2024.
 //
 
-#include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <assert.h>
 #include <cglm/cglm.h>
 #include <cglm/clipspace/persp_lh_zo.h>
+#include <engine/assets/ModelLoader.h>
+#include <engine/assets/ShaderLoader.h>
+#include <engine/assets/TextureLoader.h>
+#include <engine/graphics/RenderingHelpers.h>
+#include <engine/graphics/vulkan/VulkanHelpers.h>
+#include <engine/graphics/vulkan/VulkanResources.h>
+#include <engine/physics/Physics.h>
+#include <engine/structs/Camera.h>
+#include <engine/structs/Color.h>
+#include <engine/structs/Level.h>
+#include <engine/structs/List.h>
+#include <engine/structs/Viewmodel.h>
+#include <engine/structs/Wall.h>
+#include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
 #include <luna/luna.h>
@@ -17,19 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan_core.h>
-#include <engine/structs/Camera.h>
-#include <engine/structs/Color.h>
-#include <engine/structs/Level.h>
-#include <engine/structs/Viewmodel.h>
-#include <engine/structs/Wall.h>
-#include <engine/assets/ModelLoader.h>
-#include <engine/assets/ShaderLoader.h>
-#include <engine/assets/TextureLoader.h>
-#include <engine/subsystem/Error.h>
-#include <engine/structs/List.h>
-#include <engine/physics/Physics.h>
-#include <engine/graphics/RenderingHelpers.h>
-#include <engine/graphics/vulkan/VulkanResources.h>
 
 #pragma region variables
 bool minimized = false;
@@ -198,8 +198,18 @@ VkResult LoadSky(const ModelDefinition *skyModel)
 			   sizeof(uint32_t) * skyModel->lods[0]->indexCount[i]);
 		buffers.sky.indexCount += skyModel->lods[0]->indexCount[i];
 	}
-	lunaWriteDataToBuffer(buffers.sky.vertices.buffer, vertices, buffers.sky.vertices.bytesUsed, 0);
-	lunaWriteDataToBuffer(buffers.sky.indices.buffer, indices, buffers.sky.indices.bytesUsed, 0);
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = buffers.sky.vertices.bytesUsed,
+		.data = vertices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.sky.vertices.buffer, &vertexBufferWriteInfo);
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = buffers.sky.indices.bytesUsed,
+		.data = indices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.sky.indices.buffer, &indexBufferWriteInfo);
 
 	return VK_SUCCESS;
 }
@@ -256,8 +266,18 @@ void LoadWalls(const Level *level)
 		indices[6 * i + 4] = i * 4 + 2;
 		indices[6 * i + 5] = i * 4 + 3;
 	}
-	lunaWriteDataToBuffer(buffers.walls.vertices.buffer, vertices, buffers.walls.vertices.bytesUsed, 0);
-	lunaWriteDataToBuffer(buffers.walls.indices.buffer, indices, buffers.walls.indices.bytesUsed, 0);
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = buffers.walls.vertices.bytesUsed,
+		.data = vertices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.walls.vertices.buffer, &vertexBufferWriteInfo);
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = buffers.walls.indices.bytesUsed,
+		.data = indices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.walls.indices.buffer, &indexBufferWriteInfo);
 }
 
 void UpdateTransformMatrix(const Camera *camera)
@@ -312,10 +332,12 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	{
 		memcpy(buffers.viewModel.instanceDatas[i].transform, viewModelMatrix, sizeof(mat4));
 	}
-	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer,
-						  buffers.viewModel.instanceDatas,
-						  sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
-						  0);
+	const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
+		.bytes = sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
+		.data = buffers.viewModel.instanceDatas,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
 }
 
 void EnsureSpaceForUiElements(const size_t vertexCount, const size_t indexCount)

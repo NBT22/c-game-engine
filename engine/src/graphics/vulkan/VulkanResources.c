@@ -2,7 +2,17 @@
 // Created by Noah on 12/18/2024.
 //
 
+#include <engine/assets/ModelLoader.h>
+#include <engine/assets/TextureLoader.h>
+#include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanResources.h>
+#include <engine/helpers/MathEx.h>
+#include <engine/helpers/Realloc.h>
+#include <engine/structs/GlobalState.h>
+#include <engine/structs/List.h>
+#include <engine/structs/Viewmodel.h>
+#include <engine/subsystem/Error.h>
+#include <engine/subsystem/threads/LodThread.h>
 #include <luna/luna.h>
 #include <luna/lunaBuffer.h>
 #include <luna/lunaImage.h>
@@ -14,16 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan_core.h>
-#include <engine/structs/GlobalState.h>
-#include <engine/structs/Viewmodel.h>
-#include <engine/assets/ModelLoader.h>
-#include <engine/assets/TextureLoader.h>
-#include <engine/subsystem/Error.h>
-#include <engine/structs/List.h>
-#include <engine/helpers/MathEx.h>
-#include <engine/helpers/Realloc.h>
-#include <engine/subsystem/threads/LodThread.h>
-#include <engine/graphics/vulkan/VulkanHelpers.h>
 
 VkResult CreateUiBuffers()
 {
@@ -110,16 +110,30 @@ VkResult CreateViewModelBuffers()
 	}
 
 	buffers.viewModel.drawCount = model->materialsPerSkin;
-	lunaWriteDataToBuffer(buffers.viewModel.vertices, vertexData, vertexSize, 0);
-	lunaWriteDataToBuffer(buffers.viewModel.indices, indexData, indexSize, 0);
-	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer,
-						  buffers.viewModel.instanceDatas,
-						  sizeof(ModelInstanceData) * model->materialsPerSkin,
-						  0);
-	lunaWriteDataToBuffer(buffers.viewModel.drawInfo,
-						  drawInfos,
-						  sizeof(VkDrawIndexedIndirectCommand) * model->materialsPerSkin,
-						  0);
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = vertexSize,
+		.data = vertexData,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.vertices, &vertexBufferWriteInfo);
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = indexSize,
+		.data = indexData,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.indices, &indexBufferWriteInfo);
+	const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
+		.bytes = sizeof(ModelInstanceData) * model->materialsPerSkin,
+		.data = buffers.viewModel.instanceDatas,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
+	const LunaBufferWriteInfo drawInfoBufferWriteInfo = {
+		.bytes = sizeof(VkDrawIndexedIndirectCommand) * model->materialsPerSkin,
+		.data = drawInfos,
+		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.drawInfo, &drawInfoBufferWriteInfo);
 
 	free(vertexData);
 	free(indexData);

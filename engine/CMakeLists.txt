@@ -16,8 +16,13 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 message("fetch dict")
 fetch_dict()
-message("fetch luna")
-fetch_package_tag(https://github.com/NBT22/Luna v0.2.* Luna)
+FetchContent_Declare(
+        Luna
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/../Luna
+        EXCLUDE_FROM_ALL
+        SYSTEM
+)
+FetchContent_MakeAvailable(Luna)
 if (x86_64)
     message("fetch discord sdk")
     fetch_discord_sdk()
