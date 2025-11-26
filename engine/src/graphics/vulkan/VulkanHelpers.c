@@ -17,6 +17,7 @@
 #include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Viewmodel.h>
+#include <engine/structs/ActorWall.h>
 #include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
@@ -197,17 +198,28 @@ VkResult LoadSky(const ModelDefinition *skyModel)
 			   sizeof(uint32_t) * skyModel->lods[0]->indexCount[i]);
 		buffers.sky.indexCount += skyModel->lods[0]->indexCount[i];
 	}
-	lunaWriteDataToBuffer(buffers.sky.vertices.buffer, vertices, buffers.sky.vertices.bytesUsed, 0);
-	lunaWriteDataToBuffer(buffers.sky.indices.buffer, indices, buffers.sky.indices.bytesUsed, 0);
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = buffers.sky.vertices.bytesUsed,
+		.data = vertices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.sky.vertices.buffer, &vertexBufferWriteInfo);
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = buffers.sky.indices.bytesUsed,
+		.data = indices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.sky.indices.buffer, &indexBufferWriteInfo);
 
 	return VK_SUCCESS;
 }
 
 void LoadWalls(const Map *level)
 {
-	WallVertex *vertices = buffers.walls.vertices.data;
-	uint32_t *indices = buffers.walls.indices.data;
-
+	(void)level;
+	// WallVertex *vertices = buffers.walls.vertices.data;
+	// uint32_t *indices = buffers.walls.indices.data;
+	//
 	// for (uint32_t i = 0; i < level->walls.length; i++)
 	// {
 	// 	const Wall *wall = ListGetPointer(level->walls, i);
@@ -255,8 +267,18 @@ void LoadWalls(const Map *level)
 	// 	indices[6 * i + 4] = i * 4 + 2;
 	// 	indices[6 * i + 5] = i * 4 + 3;
 	// }
-	lunaWriteDataToBuffer(buffers.walls.vertices.buffer, vertices, buffers.walls.vertices.bytesUsed, 0);
-	lunaWriteDataToBuffer(buffers.walls.indices.buffer, indices, buffers.walls.indices.bytesUsed, 0);
+	// const LunaBufferWriteInfo vertexBufferWriteInfo = {
+	// 	.bytes = buffers.walls.vertices.bytesUsed,
+	// 	.data = vertices,
+	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	// };
+	// lunaWriteDataToBuffer(buffers.walls.vertices.buffer, &vertexBufferWriteInfo);
+	// const LunaBufferWriteInfo indexBufferWriteInfo = {
+	// 	.bytes = buffers.walls.indices.bytesUsed,
+	// 	.data = indices,
+	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	// };
+	// lunaWriteDataToBuffer(buffers.walls.indices.buffer, &indexBufferWriteInfo);
 }
 
 void UpdateTransformMatrix(const Camera *camera)
@@ -311,10 +333,12 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	{
 		memcpy(buffers.viewModel.instanceDatas[i].transform, viewModelMatrix, sizeof(mat4));
 	}
-	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer,
-						  buffers.viewModel.instanceDatas,
-						  sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
-						  0);
+	const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
+		.bytes = sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
+		.data = buffers.viewModel.instanceDatas,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
 }
 
 void EnsureSpaceForUiElements(const size_t vertexCount, const size_t indexCount)

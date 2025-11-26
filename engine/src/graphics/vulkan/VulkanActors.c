@@ -13,6 +13,7 @@
 #include <engine/structs/Actor.h>
 #include <engine/structs/ActorWall.h>
 #include <engine/structs/List.h>
+#include <luna/luna.h>
 #include <luna/lunaBuffer.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -337,26 +338,36 @@ static inline VkResult InitActors(const LockingList *actors)
 	ListFree(modelLodVertexOffsets);
 	ListFree(modelLodIndexOffsets);
 
-	lunaWriteDataToBuffer(buffers.actorWalls.drawInfo.buffer,
-						  buffers.actorWalls.drawInfo.data,
-						  buffers.actorWalls.drawInfo.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorModels.vertices.buffer,
-						  buffers.actorModels.vertices.data,
-						  buffers.actorModels.vertices.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorModels.indices.buffer,
-						  buffers.actorModels.indices.data,
-						  buffers.actorModels.indices.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorModels.shadedDrawInfo.buffer,
-						  buffers.actorModels.shadedDrawInfo.data,
-						  buffers.actorModels.shadedDrawInfo.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorModels.unshadedDrawInfo.buffer,
-						  buffers.actorModels.unshadedDrawInfo.data,
-						  buffers.actorModels.unshadedDrawInfo.bytesUsed,
-						  0);
+	const LunaBufferWriteInfo actorWallDrawInfoBufferWriteInfo = {
+		.bytes = buffers.actorWalls.drawInfo.bytesUsed,
+		.data = buffers.actorWalls.drawInfo.data,
+		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorWalls.drawInfo.buffer, &actorWallDrawInfoBufferWriteInfo);
+	const LunaBufferWriteInfo actorModelsVertexBufferWriteInfo = {
+		.bytes = buffers.actorModels.vertices.bytesUsed,
+		.data = buffers.actorModels.vertices.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorModels.vertices.buffer, &actorModelsVertexBufferWriteInfo);
+	const LunaBufferWriteInfo actorModelsIndexBufferWriteInfo = {
+		.bytes = buffers.actorModels.indices.bytesUsed,
+		.data = buffers.actorModels.indices.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorModels.indices.buffer, &actorModelsIndexBufferWriteInfo);
+	const LunaBufferWriteInfo actorModelsShadedDrawInfoBufferWriteInfo = {
+		.bytes = buffers.actorModels.shadedDrawInfo.bytesUsed,
+		.data = buffers.actorModels.shadedDrawInfo.data,
+		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorModels.shadedDrawInfo.buffer, &actorModelsShadedDrawInfoBufferWriteInfo);
+	const LunaBufferWriteInfo actorModelsUnshadedDrawInfoBufferWriteInfo = {
+		.bytes = buffers.actorModels.unshadedDrawInfo.bytesUsed,
+		.data = buffers.actorModels.unshadedDrawInfo.data,
+		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorModels.unshadedDrawInfo.buffer, &actorModelsUnshadedDrawInfoBufferWriteInfo);
 
 	return VK_SUCCESS;
 }
@@ -420,14 +431,18 @@ static inline VkResult LoadActorWalls(const LockingList *actors)
 
 		wallCount++;
 	}
-	lunaWriteDataToBuffer(buffers.actorWalls.vertices.buffer,
-						  buffers.actorWalls.vertices.data,
-						  buffers.actorWalls.vertices.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorWalls.indices.buffer,
-						  buffers.actorWalls.indices.data,
-						  buffers.actorWalls.indices.bytesUsed,
-						  0);
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = buffers.actorWalls.vertices.bytesUsed,
+		.data = buffers.actorWalls.vertices.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorWalls.vertices.buffer, &vertexBufferWriteInfo);
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = buffers.actorWalls.indices.bytesUsed,
+		.data = buffers.actorWalls.indices.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorWalls.indices.buffer, &indexBufferWriteInfo);
 
 	return VK_SUCCESS;
 }
@@ -489,14 +504,18 @@ static inline VkResult UpdateActorInstanceData(const LockingList *actors)
 			wallCount++;
 		}
 	}
-	lunaWriteDataToBuffer(buffers.actorWalls.instanceData.buffer,
-						  buffers.actorWalls.instanceData.data,
-						  buffers.actorWalls.instanceData.bytesUsed,
-						  0);
-	lunaWriteDataToBuffer(buffers.actorModels.instanceData.buffer,
-						  buffers.actorModels.instanceData.data,
-						  buffers.actorModels.instanceData.bytesUsed,
-						  0);
+	const LunaBufferWriteInfo actorWallsInstanceDataBufferWriteInfo = {
+		.bytes = buffers.actorWalls.instanceData.bytesUsed,
+		.data = buffers.actorWalls.instanceData.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorWalls.instanceData.buffer, &actorWallsInstanceDataBufferWriteInfo);
+	const LunaBufferWriteInfo actorModelsInstanceDataBufferWriteInfo = {
+		.bytes = buffers.actorModels.instanceData.bytesUsed,
+		.data = buffers.actorModels.instanceData.data,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	lunaWriteDataToBuffer(buffers.actorModels.instanceData.buffer, &actorModelsInstanceDataBufferWriteInfo);
 
 	return VK_SUCCESS;
 }

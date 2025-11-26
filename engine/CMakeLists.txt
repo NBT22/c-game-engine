@@ -18,7 +18,13 @@ fetch_glew()
 fetch_dict()
 
 message(STATUS "Fetching Luna...")
-fetch_package_tag(https://github.com/NBT22/Luna "v0.2.*" Luna)
+FetchContent_Declare(
+        Luna
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/../Luna
+        EXCLUDE_FROM_ALL
+        SYSTEM
+)
+FetchContent_MakeAvailable(Luna)
 if (x86_64)
     fetch_discord_sdk()
 endif ()
@@ -31,7 +37,7 @@ fetch_package_tag(https://github.com/recp/cglm.git v0.*.* cglm)
 if (JOLT_BUILD_TYPE_RELWITHDEBINFO AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(JPH_BUILD_TYPE RelWithDebInfo)
 endif ()
-message(STATUS "Fetching JoltC/Jolt")
+message(STATUS "Fetching JoltC/Jolt...")
 fetch_package(https://github.com/NBT22/joltc main joltc)
 set_target_properties(Jolt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(joltc PROPERTIES POSITION_INDEPENDENT_CODE ON)

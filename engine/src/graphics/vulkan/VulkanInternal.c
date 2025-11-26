@@ -30,7 +30,7 @@
 
 static SDL_Window *vulkanWindow;
 static VkSurfaceKHR surface;
-static VkPhysicalDeviceLimits physicalDeviceLimits;
+static VkPhysicalDeviceProperties physicalDeviceProperties;
 
 bool CreateInstance(SDL_Window *window)
 {
@@ -104,8 +104,8 @@ bool CreateLogicalDevice()
 		.physicalDevicePreferenceDefinition = &devicePreferenceDefinition,
 	};
 	VulkanTest(lunaAddNewDevice2(&deviceCreationInfo), "Failed to create logical device!");
-	physicalDeviceLimits = lunaGetPhysicalDeviceProperties().limits;
-	assert(sizeof(PushConstants) <= physicalDeviceLimits.maxPushConstantsSize);
+	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
+	assert(sizeof(PushConstants) <= physicalDeviceProperties.limits.maxPushConstantsSize);
 	return true;
 }
 
@@ -192,12 +192,12 @@ bool CreateRenderPass()
 			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 	}
-	if (!(physicalDeviceLimits.framebufferColorSampleCounts &
-		  physicalDeviceLimits.framebufferDepthSampleCounts &
+	if (!(physicalDeviceProperties.limits.framebufferColorSampleCounts &
+		  physicalDeviceProperties.limits.framebufferDepthSampleCounts &
 		  msaaSamples))
 	{
-		while (!(physicalDeviceLimits.framebufferColorSampleCounts &
-				 physicalDeviceLimits.framebufferDepthSampleCounts &
+		while (!(physicalDeviceProperties.limits.framebufferColorSampleCounts &
+				 physicalDeviceProperties.limits.framebufferDepthSampleCounts &
 				 msaaSamples))
 		{
 			msaaSamples >>= 1;
@@ -229,9 +229,9 @@ bool CreateRenderPass()
 	const LunaRenderPassCreationInfo renderPassCreationInfo = {
 		.samples = msaaSamples,
 		.createColorAttachment = true,
-		.colorAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_CLEAR,
+		.colorAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_MODE_CLEAR,
 		.createDepthAttachment = true,
-		.depthAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_CLEAR,
+		.depthAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_MODE_CLEAR,
 		.subpassCount = 1,
 		.subpasses = &subpassCreationInfo,
 		.dependencyCount = 1,
@@ -272,7 +272,7 @@ bool CreateTextureSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 	const LunaSamplerCreationInfo nearestRepeatSamplerCreateInfo = {
@@ -282,7 +282,7 @@ bool CreateTextureSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 	const LunaSamplerCreationInfo linearNoRepeatSamplerCreateInfo = {
@@ -292,7 +292,7 @@ bool CreateTextureSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 
@@ -303,7 +303,7 @@ bool CreateTextureSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 	VulkanTest(lunaCreateSampler(&linearRepeatSamplerCreateInfo, &textureSamplers.linearRepeat),
