@@ -444,7 +444,7 @@ void RenderMap3D(const Map *map, const Camera *cam)
 	switch (currentRenderer)
 	{
 		case RENDERER_VULKAN:
-			VK_RenderLevel(map, cam, &GetState()->viewmodel);
+			VK_RenderMap(map, cam);
 			break;
 		case RENDERER_OPENGL:
 			GL_RenderMap(map, cam);

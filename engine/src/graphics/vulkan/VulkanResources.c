@@ -2,15 +2,14 @@
 // Created by Noah on 12/18/2024.
 //
 
-#include <engine/assets/ModelLoader.h>
+#include <cglm/cglm.h>
+#include <engine/assets/AssetReader.h>
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanResources.h>
 #include <engine/helpers/MathEx.h>
-#include <engine/helpers/Realloc.h>
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/List.h>
-#include <engine/structs/Viewmodel.h>
 #include <engine/subsystem/Error.h>
 #include <engine/subsystem/threads/LodThread.h>
 #include <luna/luna.h>
@@ -25,25 +24,110 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
-VkResult CreateUiBuffers()
+/**
+ * A helper function which creates the underlying @c LunaBuffer for a given @c BufferRegion,
+ *  with the size of the buffer given by the @c allocatedSize field on the buffer region
+ * @param bufferRegion A pointer to the buffer region that should have a buffer created for it
+ * @param usage The usage flags of the buffer to create
+ * @return @c VK_SUCCESS if the buffer region was successfully created, or a meaningful result code otherwise
+ */
+static inline VkResult CreateBufferRegion(BufferRegion *bufferRegion, const VkBufferUsageFlags usage)
 {
 	const LunaBufferCreationInfo vertexBufferCreationInfo = {
-		.size = buffers.ui.vertices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.size = bufferRegion->allocatedSize,
+		.usage = usage,
 	};
-	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &buffers.ui.vertices.buffer),
-						   "Failed to create UI vertex buffer!");
-	buffers.ui.vertices.data = malloc(buffers.ui.vertices.allocatedSize);
-	CheckAlloc(buffers.ui.vertices.data);
+	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &bufferRegion->buffer),
+						   "Failed to create buffer region!");
 
-	const LunaBufferCreationInfo indexBufferCreationInfo = {
-		.size = buffers.ui.indices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	return VK_SUCCESS;
+}
+
+/**
+ * A helper function which creates the underlying @c LunaBuffer and @c data pointer for a given @c BufferRegionWithData,
+ *  with the size of the buffer and data pointer allocation given by the @c allocatedSize field on the buffer region
+ * @param bufferRegion A pointer to the buffer region that should have a buffer and data pointer created for it
+ * @param usage The usage flags of the buffer to create
+ * @return @c VK_SUCCESS if the buffer region and data pointer were successfully created,
+ *          or a meaningful result code otherwise
+ */
+static inline VkResult CreateBufferRegionWithData(BufferRegionWithData *bufferRegion, const VkBufferUsageFlags usage)
+{
+	const LunaBufferCreationInfo vertexBufferCreationInfo = {
+		.size = bufferRegion->allocatedSize,
+		.usage = usage,
 	};
-	VulkanTestReturnResult(lunaCreateBuffer(&indexBufferCreationInfo, &buffers.ui.indices.buffer),
+	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &bufferRegion->buffer),
+						   "Failed to create buffer region with data!");
+	bufferRegion->data = malloc(bufferRegion->allocatedSize);
+	CheckAlloc(bufferRegion->data);
+
+	return VK_SUCCESS;
+}
+
+/**
+ * A helper function which resizes a @c BufferRegion struct to fit the @c bytesUsed field.
+ * @note Resizing a buffer is typically a slow operation, since most of the time the data will have to be copied from
+ *        one place to another within VRAM, rather than just extending the current block.
+ * @param bufferRegion A pointer to the buffer region that should be resized
+ * @return @c VK_SUCCESS of the buffer region was successfully resized, or a meaningful result code otherwise
+ */
+static inline VkResult ResizeBufferRegion(BufferRegion *bufferRegion)
+{
+	if (bufferRegion->allocatedSize < bufferRegion->bytesUsed)
+	{
+		VulkanTestReturnResult(lunaResizeBuffer(&bufferRegion->buffer, bufferRegion->bytesUsed),
+							   "Failed to resize buffer region!");
+		bufferRegion->allocatedSize = bufferRegion->bytesUsed;
+	}
+
+	return VK_SUCCESS;
+}
+
+/**
+ * A helper function which resizes a @c BufferRegionWithData struct to fit the @c bytesUsed field. This resizes both the
+ *  buffer, as well as the @c data pointer.
+ * @note Resizing a buffer is typically a slow operation, since most of the time the data will have to be copied from
+ *        one place to another within VRAM, rather than just extending the current block.
+ * @param bufferRegion A pointer to the buffer region that should be resized
+ * @return @c VK_SUCCESS of the buffer region was successfully resized, or a meaningful result code otherwise
+ */
+static inline VkResult ResizeBufferRegionWithData(BufferRegionWithData *bufferRegion)
+{
+	if (bufferRegion->allocatedSize < bufferRegion->bytesUsed)
+	{
+		VulkanTestReturnResult(lunaResizeBuffer(&bufferRegion->buffer, bufferRegion->bytesUsed),
+							   "Failed to resize buffer region with data!");
+		bufferRegion->allocatedSize = bufferRegion->bytesUsed;
+	}
+
+	void *newData = realloc(bufferRegion->data, bufferRegion->allocatedSize);
+	CheckAlloc(newData);
+	bufferRegion->data = newData;
+
+	return VK_SUCCESS;
+}
+
+VkResult CreateUiBuffers()
+{
+	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.ui.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+						   "Failed to create UI vertex buffer!");
+	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.ui.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
 						   "Failed to create UI index buffer!");
-	buffers.ui.indices.data = malloc(buffers.ui.indices.allocatedSize);
-	CheckAlloc(buffers.ui.indices.data);
+
+	return VK_SUCCESS;
+}
+
+VkResult CreateMapBuffers()
+{
+	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+						   "Failed to create map vertex buffer!");
+	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.perMaterialData, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+						   "Failed to create map per-material data buffer!");
+	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
+						   "Failed to create map index buffer!");
+	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.drawInfo, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT),
+						   "Failed to create map draw info buffer!");
 
 	return VK_SUCCESS;
 }
@@ -51,24 +135,24 @@ VkResult CreateUiBuffers()
 VkResult CreateDebugDrawBuffers()
 {
 #ifdef JPH_DEBUG_RENDERER
-	const LunaBufferCreationInfo linesBufferCreationInfo = {
-		.size = buffers.debugDrawLines.vertices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&linesBufferCreationInfo, &buffers.debugDrawLines.vertices.buffer),
+	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.debugDrawLines.vertices,
+													  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
 						   "Failed to create debug draw lines buffer!");
-	buffers.debugDrawLines.vertices.data = malloc(buffers.debugDrawLines.vertices.allocatedSize);
-	CheckAlloc(buffers.debugDrawLines.vertices.data);
-
-	const LunaBufferCreationInfo trianglesBufferCreationInfo = {
-		.size = buffers.debugDrawTriangles.vertices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&trianglesBufferCreationInfo, &buffers.debugDrawTriangles.vertices.buffer),
+	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.debugDrawTriangles.vertices,
+													  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
 						   "Failed to create debug draw triangles buffer!");
-	buffers.debugDrawTriangles.vertices.data = malloc(buffers.debugDrawTriangles.vertices.allocatedSize);
-	CheckAlloc(buffers.debugDrawTriangles.vertices.data);
 #endif
+
+	return VK_SUCCESS;
+}
+
+VkResult ResizeMapBuffers()
+{
+	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.vertices), "Failed to resize map vertex buffer!");
+	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.perMaterialData),
+						   "Failed to resize map per-material data buffer!");
+	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.indices), "Failed to resize map index buffer!");
+	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.drawInfo), "Failed to resize map draw info buffer!");
 
 	return VK_SUCCESS;
 }
@@ -76,24 +160,11 @@ VkResult CreateDebugDrawBuffers()
 VkResult ResizeDebugDrawBuffers()
 {
 #ifdef JPH_DEBUG_RENDERER
-	lunaDestroyBuffer(buffers.debugDrawLines.vertices.buffer);
-	lunaDestroyBuffer(buffers.debugDrawTriangles.vertices.buffer);
-
-
-	const LunaBufferCreationInfo linesBufferCreationInfo = {
-		.size = buffers.debugDrawLines.vertices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	const LunaBufferCreationInfo trianglesBufferCreationInfo = {
-		.size = buffers.debugDrawTriangles.vertices.allocatedSize,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&linesBufferCreationInfo, &buffers.debugDrawLines.vertices.buffer),
-						   "Failed to recreate debug draw lines buffer!");
-	VulkanTestReturnResult(lunaCreateBuffer(&trianglesBufferCreationInfo, &buffers.debugDrawTriangles.vertices.buffer),
-						   "Failed to recreate debug draw triangles buffer!");
-
+	VulkanTestReturnResult(ResizeBufferRegionWithData(&buffers.debugDrawLines.vertices),
+						   "Failed to resize debug draw lines buffer!");
 	buffers.debugDrawLines.shouldResize = false;
+	VulkanTestReturnResult(ResizeBufferRegionWithData(&buffers.debugDrawTriangles.vertices),
+						   "Failed to resize debug draw triangles buffer!");
 	buffers.debugDrawTriangles.shouldResize = false;
 #endif
 

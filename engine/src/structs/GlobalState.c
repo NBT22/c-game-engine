@@ -109,10 +109,10 @@ void ChangeMap(Map *map)
 	}
 	state.map = map;
 	LoadMapModels(map);
-	// if (strncmp(level->music, "none", 4) != 0)
+	// if (strncmp(map->music, "none", 4) != 0)
 	// {
 	// 	char musicPath[80];
-	// 	snprintf(musicPath, sizeof(musicPath), SOUND("%s"), level->music);
+	// 	snprintf(musicPath, sizeof(musicPath), SOUND("%s"), map->music);
 	// 	ChangeMusic(musicPath);
 	// } else
 	// {

@@ -19,8 +19,9 @@
 
 typedef struct GlobalLightData
 {
-	Vector2 lightAngle;
-	Color lightColor;
+	float pitch;
+	float yaw;
+	Color color;
 	bool startOn;
 } GlobalLightData;
 
@@ -31,9 +32,9 @@ void GlobalLightInit(Actor *this, const KvList params, Transform *transform)
 	GlobalLightData *data = this->extraData;
 	Vector3 euler;
 	JPH_Quat_GetEulerAngles(&transform->rotation, &euler);
-	data->lightAngle.x = euler.x;
-	data->lightAngle.y = euler.y;
-	data->lightColor = KvGetColor(params, "light_color", COLOR_WHITE);
+	data->pitch = euler.x;
+	data->yaw = euler.y;
+	data->color = KvGetColor(params, "light_color", COLOR_WHITE);
 	data->startOn = KvGetBool(params, "start_on", true);
 }
 
@@ -42,8 +43,9 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 	GlobalLightData *data = this->extraData;
 	if (data->startOn)
 	{
-		GetState()->map->lightAngle = data->lightAngle;
-		GetState()->map->lightColor = data->lightColor;
+		GetState()->map->lightPitch = data->pitch;
+		GetState()->map->lightYaw = data->yaw;
+		GetState()->map->lightColor = data->color;
 		data->startOn = false;
 	}
 }
@@ -51,8 +53,9 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 static void GlobalLightSetHandler(Actor *this, const Actor * /*sender*/, const Param * /*param*/)
 {
 	const GlobalLightData *data = this->extraData;
-	GetState()->map->lightAngle = data->lightAngle;
-	GetState()->map->lightColor = data->lightColor;
+	GetState()->map->lightPitch = data->pitch;
+	GetState()->map->lightYaw = data->yaw;
+	GetState()->map->lightColor = data->color;
 }
 
 static ActorDefinition definition = {

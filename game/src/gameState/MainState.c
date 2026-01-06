@@ -138,7 +138,7 @@ void MainStateFixedUpdate(GlobalState *state, const double delta)
 	{
 		Error("Failed to wait for LOD thread end semaphore!");
 	}
-	// WARNING: Any access to `state->level->actors` with ANY chance of modifying it MUST not happen before this!
+	// WARNING: Any access to `state->map->actors` with ANY chance of modifying it MUST not happen before this!
 
 	const float deltaTime = (float)delta / PHYSICS_TARGET_TPS;
 
@@ -180,7 +180,7 @@ void MainStateFixedUpdate(GlobalState *state, const double delta)
 		Error("Failed to update physics!");
 	}
 
-	// WARNING: Any access to `state->level->actors` with ANY chance of modifying it MUST not happen after this!
+	// WARNING: Any access to `state->map->actors` with ANY chance of modifying it MUST not happen after this!
 	if (SignalLodThreadCanStart() != 0)
 	{
 		Error("Failed to signal LOD thread start semaphore!");

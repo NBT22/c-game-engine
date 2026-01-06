@@ -110,7 +110,7 @@ bool CreateUIPipeline()
 	VulkanTest(CreateShaderModule(SHADER("vulkan/ui_f"), SHADER_TYPE_FRAG, &fragShaderModule),
 			   "Failed to load UI fragment shader!");
 
-	const LunaPipelineShaderStageCreationInfo uiShaderStages[] = {
+	const LunaPipelineShaderStageCreationInfo shaderStages[] = {
 		{
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
 			.module = vertShaderModule,
@@ -161,8 +161,8 @@ bool CreateUIPipeline()
 	};
 
 	const LunaGraphicsPipelineCreationInfo pipelineInfo = {
-		.shaderStageCount = sizeof(uiShaderStages) / sizeof(*uiShaderStages),
-		.shaderStages = uiShaderStages,
+		.shaderStageCount = sizeof(shaderStages) / sizeof(*shaderStages),
+		.shaderStages = shaderStages,
 		.vertexInputState = &vertexInputInfo,
 		.inputAssemblyState = &inputAssembly,
 		.viewportState = &viewportState,
@@ -175,6 +175,97 @@ bool CreateUIPipeline()
 		.subpass = lunaGetRenderPassSubpassByName(renderPass, NULL),
 	};
 	VulkanTest(lunaCreateGraphicsPipeline(&pipelineInfo, &pipelines.ui), "Failed to create UI graphics pipeline!");
+
+	return true;
+}
+
+bool CreateMapPipeline()
+{
+	LunaShaderModule vertShaderModule = LUNA_NULL_HANDLE;
+	LunaShaderModule fragShaderModule = LUNA_NULL_HANDLE;
+	VulkanTest(CreateShaderModule(SHADER("vulkan/map_v"), SHADER_TYPE_VERT, &vertShaderModule),
+			   "Failed to load map vertex shader!");
+	VulkanTest(CreateShaderModule(SHADER("vulkan/map_f"), SHADER_TYPE_FRAG, &fragShaderModule),
+			   "Failed to load map fragment shader!");
+
+	const LunaPipelineShaderStageCreationInfo shaderStages[] = {
+		{
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = vertShaderModule,
+		},
+		{
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = fragShaderModule,
+		},
+	};
+
+	const VkVertexInputBindingDescription bindingDescriptions[] = {
+		{
+			.binding = 0,
+			.stride = sizeof(MapVertex),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
+		{
+			.binding = 1,
+			.stride = sizeof(uint32_t),
+			.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
+		},
+	};
+	const VkVertexInputAttributeDescription attributeDescriptions[] = {
+		{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(MapVertex, position),
+		},
+		{
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(MapVertex, uv),
+		},
+		{
+			.location = 2,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(MapVertex, color),
+		},
+		{
+			.location = 3,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(MapVertex, normal),
+		},
+		{
+			.location = 4,
+			.binding = 1,
+			.format = VK_FORMAT_R32_UINT,
+			.offset = 0,
+		},
+	};
+	const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = sizeof(bindingDescriptions) / sizeof(*bindingDescriptions),
+		.pVertexBindingDescriptions = bindingDescriptions,
+		.vertexAttributeDescriptionCount = sizeof(attributeDescriptions) / sizeof(*attributeDescriptions),
+		.pVertexAttributeDescriptions = attributeDescriptions,
+	};
+
+	const LunaGraphicsPipelineCreationInfo pipelineInfo = {
+		.shaderStageCount = sizeof(shaderStages) / sizeof(*shaderStages),
+		.shaderStages = shaderStages,
+		.vertexInputState = &vertexInputInfo,
+		.inputAssemblyState = &inputAssembly,
+		.viewportState = &viewportState,
+		.rasterizationState = &cullingRasterizer,
+		.multisampleState = &multisampling,
+		.depthStencilState = &depthStencilState,
+		.colorBlendState = &colorBlending,
+		.dynamicState = &dynamicState,
+		.layoutCreationInfo = pipelineLayoutCreationInfo,
+		.subpass = lunaGetRenderPassSubpassByName(renderPass, NULL),
+	};
+	VulkanTest(lunaCreateGraphicsPipeline(&pipelineInfo, &pipelines.map), "Failed to create map graphics pipeline!");
 
 	return true;
 }
@@ -274,6 +365,6 @@ bool CreateGraphicsPipelines()
 	multisampling.rasterizationSamples = msaaSamples;
 
 	// clang-format off
-	return CreateUIPipeline() && CreateDebugDrawPipeline();
+	return CreateUIPipeline() && CreateMapPipeline() && CreateDebugDrawPipeline();
 	// clang-format on
 }

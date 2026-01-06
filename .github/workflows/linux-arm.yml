@@ -20,10 +20,6 @@ jobs:
           - build_type: Release
             zip_name: game.linux.arm64.release
 
-# TODO: This
-#    env:
-#      CMAKE_BUILD_PARALLEL_LEVEL: $(nproc)
-
     steps:
       - uses: actions/checkout@v5
 
@@ -40,7 +36,7 @@ jobs:
         run: cmake -B build-${{ matrix.build_type }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
       - name: Build
-        run: cmake --build build-${{ matrix.build_type }} --target launcher
+        run: cmake --build build-${{ matrix.build_type }} --target launcher -j $(nproc)
 
       - name: Upload results
         uses: actions/upload-artifact@v5

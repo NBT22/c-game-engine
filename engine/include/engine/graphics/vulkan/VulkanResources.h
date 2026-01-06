@@ -11,7 +11,11 @@
 
 VkResult CreateUiBuffers();
 
+VkResult CreateMapBuffers();
+
 VkResult CreateDebugDrawBuffers();
+
+VkResult ResizeMapBuffers();
 
 VkResult ResizeDebugDrawBuffers();
 

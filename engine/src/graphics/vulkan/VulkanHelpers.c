@@ -5,24 +5,20 @@
 #include <assert.h>
 #include <cglm/cglm.h>
 #include <cglm/clipspace/persp_lh_zo.h>
-#include <engine/assets/ModelLoader.h>
 #include <engine/assets/ShaderLoader.h>
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/RenderingHelpers.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanResources.h>
 #include <engine/physics/Physics.h>
-#include <engine/structs/ActorWall.h>
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
 #include <engine/structs/List.h>
-#include <engine/structs/Map.h>
 #include <engine/structs/Viewmodel.h>
 #include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
 #include <luna/luna.h>
-#include <luna/lunaBuffer.h>
 #include <luna/lunaTypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -58,9 +54,18 @@ Pipelines pipelines = {
 	.debugDrawTriangles = LUNA_NULL_HANDLE,
 #endif
 };
+#define MAX_UI_QUADS_INIT 8192 // TODO: Ensure this is a good value for GGUI
+#define MAX_MAP_TRIANGLES_PER_MAT_INIT 1024
+#define MAX_MAP_MATERIALS_INIT 16
 Buffers buffers = {
 	.ui.vertices.allocatedSize = sizeof(UiVertex) * 4 * MAX_UI_QUADS_INIT,
 	.ui.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_UI_QUADS_INIT,
+
+	.map.vertices.allocatedSize = sizeof(MapVertex) * 3 *  MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
+	.map.perMaterialData.allocatedSize = sizeof(uint32_t) * MAX_MAP_MATERIALS,
+	.map.indices.allocatedSize = sizeof(uint32_t) * 3 *  MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
+	.map.drawInfo.allocatedSize = sizeof(VkDrawIndexedIndirectCommand) * MAX_MAP_MATERIALS,
+
 #ifdef JPH_DEBUG_RENDERER
 	.debugDrawLines.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
 	.debugDrawTriangles.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
@@ -111,17 +116,6 @@ inline uint32_t ImageIndex(const Image *image)
 		return imageAssetIdToIndexMap[image->id];
 	}
 	return index;
-}
-
-VkResult LoadSky(const ModelDefinition *skyModel)
-{
-	(void)skyModel;
-	return VK_SUCCESS;
-}
-
-void LoadWalls(const Map *level)
-{
-	(void)level;
 }
 
 // TODO: Make sure this doesn't need changes

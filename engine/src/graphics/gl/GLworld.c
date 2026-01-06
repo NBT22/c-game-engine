@@ -403,9 +403,9 @@ void GL_SetMapParams(mat4 *modelViewProjection, const Map *map)
 	uniforms.lightColor[1] = map->lightColor.g;
 	uniforms.lightColor[2] = map->lightColor.b;
 
-	uniforms.lightDirection[0] = cosf(map->lightAngle.x) * sinf(map->lightAngle.y);
-	uniforms.lightDirection[1] = sinf(map->lightAngle.x);
-	uniforms.lightDirection[2] = -cosf(map->lightAngle.x) * cosf(map->lightAngle.y);
+	uniforms.lightDirection[0] = cosf(map->lightPitch) * sinf(map->lightYaw);
+	uniforms.lightDirection[1] = sinf(map->lightPitch);
+	uniforms.lightDirection[2] = -cosf(map->lightPitch) * cosf(map->lightYaw);
 
 	glBindBuffer(GL_UNIFORM_BUFFER, sharedUniformBuffer);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(GL_SharedUniforms), &uniforms, GL_STREAM_DRAW);

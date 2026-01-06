@@ -25,8 +25,6 @@
 #pragma region macros
 #define MAX_FRAMES_IN_FLIGHT 1
 
-#define MAX_UI_QUADS_INIT 8192 // TODO: Ensure this is a good value for GGUI
-
 #ifdef JPH_DEBUG_RENDERER
 #define MAX_DEBUG_DRAW_VERTICES_INIT 1024
 #endif
@@ -117,20 +115,40 @@ typedef struct BufferRegion
 	LunaBuffer buffer;
 	VkDeviceSize bytesUsed;
 	VkDeviceSize allocatedSize;
-	void *data;
 } BufferRegion;
+
+typedef struct BufferRegionWithData
+{
+	LunaBuffer buffer;
+	VkDeviceSize bytesUsed;
+	VkDeviceSize allocatedSize;
+	void *data;
+} BufferRegionWithData;
 
 typedef struct UiBuffer
 {
-	BufferRegion vertices;
-	BufferRegion indices;
+	BufferRegionWithData vertices;
+	BufferRegionWithData indices;
 	bool shouldResize;
 } UiBuffer;
+
+/// Contains all the information needed to keep track of the required buffers for the map models
+typedef struct MapBuffer
+{
+	/// A buffer containing per-vertex data
+	BufferRegion vertices;
+	/// A buffer containing data that only needs to exist once per-material
+	BufferRegion perMaterialData;
+	/// A buffer containing the index data to use along-side the per-vertex data
+	BufferRegion indices;
+	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the indirect draw call
+	BufferRegion drawInfo;
+} MapBuffer;
 
 #ifdef JPH_DEBUG_RENDERER
 typedef struct DebugDrawBuffer
 {
-	BufferRegion vertices;
+	BufferRegionWithData vertices;
 	uint32_t vertexCount;
 	bool shouldResize;
 } DebugDrawBuffer;
@@ -139,6 +157,7 @@ typedef struct DebugDrawBuffer
 typedef struct Buffers
 {
 	UiBuffer ui;
+	MapBuffer map;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -148,6 +167,7 @@ typedef struct Buffers
 typedef struct Pipelines
 {
 	LunaGraphicsPipeline ui;
+	LunaGraphicsPipeline map;
 #ifdef JPH_DEBUG_RENDERER
 	LunaGraphicsPipeline debugDrawLines;
 	LunaGraphicsPipeline debugDrawTriangles;
@@ -167,15 +187,12 @@ typedef struct TextureSamplers
 } TextureSamplers;
 
 // TODO: In isolated testing there was improved performance from using a descriptor rather than using push constants, even for just the transform matrix
-typedef struct __attribute__((aligned(16))) PushConstants
+typedef struct PushConstants
 {
-	// Note: These are updated based on the design doc for the rewrite
 	mat4 transformMatrix;
-	Color fogColor;
-	float fogStart;
-	float fogEnd;
 	Color lightingColor;
-	float lightingDirection;
+	Vector3 lightingNormal;
+	alignas(16) float padding; // Pad to align with the GLSL struct
 } PushConstants;
 #pragma endregion typedefs
 
@@ -202,10 +219,6 @@ VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderM
 uint32_t TextureIndex(const char *texture);
 
 uint32_t ImageIndex(const Image *image);
-
-VkResult LoadSky(const ModelDefinition *skyModel);
-
-void LoadWalls(const Map *level);
 
 void UpdateTransformMatrix(const Camera *camera);
 

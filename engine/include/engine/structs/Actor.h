@@ -60,7 +60,7 @@ struct Actor
 	ModelDefinition *actorModel;
 	/// The index of the active skin for the actor's model
 	uint32_t currentSkinIndex;
-	/// The current LOD level of the actor's model, re-calculated each physics tick
+	/// The current LOD of the actor's model, re-calculated each physics tick
 	uint32_t currentLod;
 	/// The color modifier of the actor's model
 	Color modColor;

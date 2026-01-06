@@ -42,13 +42,19 @@
  */
 bool VK_Init(SDL_Window *window);
 
-bool VK_LoadLevelWalls(const Map *level);
-
 bool VK_UpdateActors(const LockingList *actors, bool shouldReloadActors);
 
 VkResult VK_FrameStart();
 
-VkResult VK_RenderLevel(const Map *level, const Camera *camera, const Viewmodel *viewmodel);
+/**
+ * Render a given map. This function will automatically load the map if it is not yet loaded, then it will update
+ *  descriptor sets and push constants, before making the actual draw call for the level. This function does NOT submit
+ *  any command buffers, present to the screen, or even begin the actual rendering process.
+ * @param map The map to render
+ * @param camera The camera from which the map should be rendered
+ * @return @c VK_SUCCESS if the map was rendered successfully, or a meaningful result code otherwise
+ */
+VkResult VK_RenderMap(const Map *map, const Camera *camera);
 
 VkResult VK_FrameEnd();
 

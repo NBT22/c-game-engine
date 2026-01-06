@@ -4,22 +4,18 @@
 
 #include <assert.h>
 #include <cglm/types.h>
-#include <engine/assets/AssetReader.h>
-#include <engine/assets/ModelLoader.h>
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/Drawing.h>
 #include <engine/graphics/vulkan/Vulkan.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanInternal.h>
-#include <engine/graphics/vulkan/VulkanResources.h>
-#include <engine/helpers/MathEx.h>
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
+#include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Viewmodel.h>
 #include <engine/subsystem/Logging.h>
 #include <engine/subsystem/threads/LodThread.h>
-#include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
 #include <luna/lunaBuffer.h>
 #include <luna/lunaDevice.h>
@@ -35,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan_core.h>
+
+#include "engine/graphics/vulkan/VulkanResources.h"
 #ifdef JPH_DEBUG_RENDERER
 #include <engine/debug/JoltDebugRenderer.h>
 #include <engine/subsystem/Error.h>
@@ -44,6 +42,97 @@
 
 /// Notably not a frame counter, this is just the index used for determining which of the in-flight frames is active
 static uint8_t currentFrameIndex;
+static const Map *loadedMap;
+
+/**
+ * Loads a map into VRAM. This function is responsible for
+ *  1. Ensuring that the target buffers are large enough to hold the data, and resizing as needed
+ *  2. Copying the data out of the Map struct and into VRAM, using temporary CPU-side buffers in order to combine
+ *      all map models into one large vertex buffer and one large index buffer
+ *  3. Copying any data that is only required once per material into the @c perMaterialData buffer
+ *  4. Generating the @c VkDrawIndexedIndirectCommand structures that are stored in the @c drawInfo buffer
+ *  5. Setting the initial state for any relevant descriptor sets or push constants
+ * @todo This function should set the initial state for any descriptor sets and push constants
+ * @param map The map to load
+ * @return @c VK_SUCCESS if the map was successfully loaded, or a meaningful result code otherwise
+ */
+static inline VkResult LoadMap(const Map *map)
+{
+	buffers.map.vertices.bytesUsed = 0;
+	buffers.map.perMaterialData.bytesUsed = 0;
+	buffers.map.indices.bytesUsed = 0;
+	buffers.map.drawInfo.bytesUsed = 0;
+	for (size_t i = 0; i < map->modelCount; i++)
+	{
+		buffers.map.vertices.bytesUsed += map->models[i].vertexCount * sizeof(MapVertex);
+		buffers.map.perMaterialData.bytesUsed += sizeof(uint32_t); // uint32_t textureIndex
+		buffers.map.indices.bytesUsed += map->models[i].indexCount * sizeof(uint32_t);
+		buffers.map.drawInfo.bytesUsed += sizeof(VkDrawIndexedIndirectCommand);
+	}
+	VulkanTestReturnResult(ResizeMapBuffers(), "Failed to resize map buffers!");
+
+	// TODO: `vertices`, `indices`, and `drawInfo` get leaked if any of the VulkanTest macros cause us to return early
+	MapVertex *vertices = malloc(buffers.map.vertices.bytesUsed);
+	CheckAlloc(vertices);
+	VkDeviceSize vertexCount = 0;
+	uint32_t textureIndices[map->modelCount];
+	uint32_t *indices = malloc(buffers.map.indices.bytesUsed);
+	CheckAlloc(indices);
+	VkDeviceSize indexCount = 0;
+	VkDrawIndexedIndirectCommand *drawInfo = calloc(map->modelCount, sizeof(VkDrawIndexedIndirectCommand));
+	CheckAlloc(drawInfo);
+	for (size_t i = 0; i < map->modelCount; i++)
+	{
+		memcpy(vertices + vertexCount, map->models[i].vertices, map->models[i].vertexCount * sizeof(MapVertex));
+		textureIndices[i] = TextureIndex(map->models[i].material->texture);
+		memcpy(indices + indexCount, map->models[i].indices, map->models[i].indexCount * sizeof(uint32_t));
+		drawInfo[i].indexCount = map->models[i].indexCount;
+		drawInfo[i].instanceCount = 1;
+		drawInfo[i].firstIndex = indexCount;
+		drawInfo[i].vertexOffset = (int32_t)vertexCount;
+		drawInfo[i].firstInstance = i;
+
+		vertexCount += map->models[i].vertexCount;
+		indexCount += map->models[i].indexCount;
+	}
+
+	const LunaBufferWriteInfo vertexBufferWriteInfo = {
+		.bytes = buffers.map.vertices.bytesUsed,
+		.data = vertices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.vertices.buffer, &vertexBufferWriteInfo),
+						   "Failed to write data to vertex buffer!");
+	const LunaBufferWriteInfo perMaterialDataBufferWriteInfo = {
+		.bytes = buffers.map.perMaterialData.bytesUsed,
+		.data = textureIndices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.perMaterialData.buffer, &perMaterialDataBufferWriteInfo),
+						   "Failed to write data to per-material data buffer!");
+	const LunaBufferWriteInfo indexBufferWriteInfo = {
+		.bytes = buffers.map.indices.bytesUsed,
+		.data = indices,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.indices.buffer, &indexBufferWriteInfo),
+						   "Failed to write data to index buffer!");
+	const LunaBufferWriteInfo drawInfoBufferWriteInfo = {
+		.bytes = buffers.map.drawInfo.bytesUsed,
+		.data = drawInfo,
+		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.drawInfo.buffer, &drawInfoBufferWriteInfo),
+						   "Failed to write data to draw info buffer!");
+
+	free(vertices);
+	free(indices);
+	free(drawInfo);
+
+	loadedMap = map;
+
+	return VK_SUCCESS;
+}
 
 bool VK_Init(SDL_Window *window)
 {
@@ -110,11 +199,6 @@ bool VK_Init(SDL_Window *window)
 	return false;
 }
 
-bool VK_LoadLevelWalls(const Map *level)
-{
-	return true;
-}
-
 bool VK_UpdateActors(const LockingList *actors, const bool shouldReloadActors)
 {
 	// TODO: Implement this
@@ -162,8 +246,65 @@ VkResult VK_FrameStart()
 	return VK_SUCCESS;
 }
 
-VkResult VK_RenderLevel(const Map *level, const Camera *camera, const Viewmodel *viewmodel)
+VkResult VK_RenderMap(const Map *map, const Camera *camera)
 {
+	if (map != loadedMap)
+	{
+		VulkanTestReturnResult(LoadMap(map), "Failed to load map!");
+	}
+
+	pushConstants.lightingColor = map->lightColor;
+	pushConstants.lightingNormal.x = cosf(map->lightPitch) * sinf(map->lightYaw);
+	pushConstants.lightingNormal.y = sinf(map->lightPitch);
+	pushConstants.lightingNormal.z = -cosf(map->lightPitch) * cosf(map->lightYaw);
+	UpdateTransformMatrix(camera);
+	VulkanTest(lunaPushConstants(pipelines.map), "Failed to push constants for map pipeline!");
+
+	const VkViewport viewport = {
+		.width = (float)swapChainExtent.width,
+		.height = (float)swapChainExtent.height,
+		.maxDepth = 1,
+	};
+	const LunaViewportBindInfo viewportBindInfo = {
+		.viewportCount = 1,
+		.viewports = &viewport,
+	};
+	const VkRect2D scissor = {
+		.extent = swapChainExtent,
+	};
+	const LunaScissorBindInfo scissorBindInfo = {
+		.scissorCount = 1,
+		.scissors = &scissor,
+	};
+	const LunaDynamicStateBindInfo dynamicStateBindInfos[] = {
+		{
+			.dynamicStateType = VK_DYNAMIC_STATE_VIEWPORT,
+			.bindInfo.viewportBindInfo = &viewportBindInfo,
+		},
+		{
+			.dynamicStateType = VK_DYNAMIC_STATE_SCISSOR,
+			.bindInfo.scissorBindInfo = &scissorBindInfo,
+		},
+	};
+	const LunaGraphicsPipelineBindInfo pipelineBindInfo = {
+		.descriptorSetBindInfo.descriptorSetCount = 1,
+		.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrameIndex],
+		.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
+		.dynamicStates = dynamicStateBindInfos,
+	};
+
+	lunaBindVertexBuffers(0, 2, (LunaBuffer[]){buffers.map.vertices.buffer, buffers.map.perMaterialData.buffer}, NULL);
+	VulkanTest(lunaDrawBufferIndexedIndirect(NULL,
+											 buffers.map.indices.buffer,
+											 VK_INDEX_TYPE_UINT32,
+											 pipelines.map,
+											 &pipelineBindInfo,
+											 buffers.map.drawInfo.buffer,
+											 0,
+											 map->modelCount,
+											 sizeof(VkDrawIndexedIndirectCommand)),
+			   "Failed to draw map!");
+
 	return VK_SUCCESS;
 }
 

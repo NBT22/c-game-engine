@@ -80,13 +80,29 @@ bool CreateLogicalDevice()
 	const LunaPhysicalDevicePreferenceDefinition devicePreferenceDefinition = {
 		.preferredDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
 	};
-	const LunaDeviceCreationInfo deviceCreationInfo = {
+	const VkPhysicalDeviceFeatures vulkan10Features = {
+		.samplerAnisotropy = VK_TRUE,
+		.multiDrawIndirect = VK_TRUE,
+	};
+	VkPhysicalDeviceVulkan12Features vulkan12Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+		.runtimeDescriptorArray = VK_TRUE,
+		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+		.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+	};
+	const VkPhysicalDeviceFeatures2 requiredFeatures = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &vulkan12Features,
+		.features = vulkan10Features,
+	};
+	const LunaDeviceCreationInfo2 deviceCreationInfo = {
 		.extensionCount = 1,
 		.extensionNames = (const char *const[]){VK_KHR_SWAPCHAIN_EXTENSION_NAME},
+		.requiredFeatures = requiredFeatures,
 		.surface = surface,
 		.physicalDevicePreferenceDefinition = &devicePreferenceDefinition,
 	};
-	VulkanTest(lunaCreateDevice(&deviceCreationInfo), "Failed to create logical device!");
+	VulkanTest(lunaCreateDevice2(&deviceCreationInfo), "Failed to create logical device!");
 	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
 	assert(sizeof(PushConstants) <= physicalDeviceProperties.limits.maxPushConstantsSize);
 	// TODO: Additional checks, and change from assert to a failure that allows GL to take over
@@ -202,7 +218,7 @@ bool CreateRenderPass()
 	const LunaSubpassCreationInfo subpassCreationInfo = {
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.useColorAttachment = true,
-		.useDepthAttachment = true,
+		.useDepthAttachment = true, // TODO: Look into disabling this for UI
 	};
 	// TODO: Check that these stages are actually accurate
 	VkSubpassDependency dependency = {
@@ -239,7 +255,7 @@ bool CreateDescriptorSetLayouts()
 		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		.descriptorCount = MAX_TEXTURES,
 		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.bindingFlags = 1,
+		.bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
 	};
 	const LunaDescriptorSetLayoutCreationInfo descriptorSetLayoutCreationInfo = {
 		.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
@@ -393,6 +409,8 @@ bool CreateTextureSamplers()
 bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
+	VulkanTest(CreateMapBuffers(), "Failed to create map buffers!");
+	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;
 }
