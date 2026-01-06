@@ -276,10 +276,14 @@ typedef struct Pipelines
 
 typedef struct TextureSamplers
 {
-	LunaSampler linearRepeat;
-	LunaSampler nearestRepeat;
-	LunaSampler linearNoRepeat;
-	LunaSampler nearestNoRepeat;
+	LunaSampler linearRepeatAnisotropy;
+	LunaSampler nearestRepeatAnisotropy;
+	LunaSampler linearNoRepeatAnisotropy;
+	LunaSampler nearestNoRepeatAnisotropy;
+	LunaSampler linearRepeatNoAnisotropy;
+	LunaSampler nearestRepeatNoAnisotropy;
+	LunaSampler linearNoRepeatNoAnisotropy;
+	LunaSampler nearestNoRepeatNoAnisotropy;
 } TextureSamplers;
 
 typedef struct __attribute__((aligned(16))) PushConstants

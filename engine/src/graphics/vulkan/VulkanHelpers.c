@@ -12,12 +12,12 @@
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanResources.h>
 #include <engine/physics/Physics.h>
+#include <engine/structs/ActorWall.h>
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
 #include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Viewmodel.h>
-#include <engine/structs/ActorWall.h>
 #include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
@@ -40,10 +40,14 @@ uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
 LunaDescriptorSetLayout descriptorSetLayout = LUNA_NULL_HANDLE;
 LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
 TextureSamplers textureSamplers = {
-	.linearRepeat = LUNA_NULL_HANDLE,
-	.nearestRepeat = LUNA_NULL_HANDLE,
-	.linearNoRepeat = LUNA_NULL_HANDLE,
-	.nearestNoRepeat = LUNA_NULL_HANDLE,
+	.linearRepeatAnisotropy = LUNA_NULL_HANDLE,
+	.nearestRepeatAnisotropy = LUNA_NULL_HANDLE,
+	.linearNoRepeatAnisotropy = LUNA_NULL_HANDLE,
+	.nearestNoRepeatAnisotropy = LUNA_NULL_HANDLE,
+	.linearRepeatNoAnisotropy = LUNA_NULL_HANDLE,
+	.nearestRepeatNoAnisotropy = LUNA_NULL_HANDLE,
+	.linearNoRepeatNoAnisotropy = LUNA_NULL_HANDLE,
+	.nearestNoRepeatNoAnisotropy = LUNA_NULL_HANDLE,
 };
 PushConstants pushConstants = {0};
 LunaRenderPass renderPass = LUNA_NULL_HANDLE;
@@ -96,8 +100,9 @@ VkResult CreateShaderModule(const char *path, const ShaderType shaderType, LunaS
 	(void)shaderType;
 
 	const LunaShaderModuleCreationInfo shaderModuleCreationInfo = {
-		.size = sizeof(uint32_t) * shader->spirvLength,
-		.spirv = shader->spirv,
+		.creationInfoType = LUNA_SHADER_MODULE_CREATION_INFO_TYPE_SPIRV,
+		.creationInfoUnion.spirv.size = sizeof(uint32_t) * shader->spirvLength,
+		.creationInfoUnion.spirv.spirv = shader->spirv,
 	};
 	VulkanTestReturnResult(lunaCreateShaderModule(&shaderModuleCreationInfo, shaderModule),
 						   "Failed to create shader module!");

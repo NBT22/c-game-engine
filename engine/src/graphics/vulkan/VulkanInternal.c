@@ -76,6 +76,7 @@ bool CreateSurface()
 bool CreateLogicalDevice()
 {
 	const VkPhysicalDeviceFeatures vulkan10Features = {
+		.samplerAnisotropy = VK_TRUE,
 		.multiDrawIndirect = VK_TRUE,
 		.drawIndirectFirstInstance = VK_TRUE,
 	};
@@ -103,7 +104,7 @@ bool CreateLogicalDevice()
 		.surface = surface,
 		.physicalDevicePreferenceDefinition = &devicePreferenceDefinition,
 	};
-	VulkanTest(lunaAddNewDevice2(&deviceCreationInfo), "Failed to create logical device!");
+	VulkanTest(lunaCreateDevice2(&deviceCreationInfo), "Failed to create logical device!");
 	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
 	assert(sizeof(PushConstants) <= physicalDeviceProperties.limits.maxPushConstantsSize);
 	return true;
@@ -265,7 +266,75 @@ bool CreateDescriptorSetLayouts()
 
 bool CreateTextureSamplers()
 {
-	const LunaSamplerCreationInfo linearRepeatSamplerCreateInfo = {
+	float maxAnisotropy = 0;
+	switch (GetState()->options.anisotropy)
+	{
+		case ANISOTROPY_2X:
+			maxAnisotropy = 2;
+			break;
+		case ANISOTROPY_4X:
+			maxAnisotropy = 4;
+			break;
+		case ANISOTROPY_8X:
+			maxAnisotropy = 8;
+			break;
+		case ANISOTROPY_16X:
+			maxAnisotropy = 16;
+			break;
+		default:
+			break;
+	}
+	maxAnisotropy = max(maxAnisotropy, physicalDeviceProperties.limits.maxSamplerAnisotropy);
+	const LunaSamplerCreationInfo linearRepeatSamplerAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestRepeatSamplerAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo linearNoRepeatSamplerAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestNoRepeatSamplerAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+
+	const LunaSamplerCreationInfo linearRepeatSamplerNoAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_LINEAR,
 		.minFilter = VK_FILTER_LINEAR,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
@@ -275,7 +344,7 @@ bool CreateTextureSamplers()
 		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
-	const LunaSamplerCreationInfo nearestRepeatSamplerCreateInfo = {
+	const LunaSamplerCreationInfo nearestRepeatSamplerNoAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_NEAREST,
 		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
@@ -285,9 +354,19 @@ bool CreateTextureSamplers()
 		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
-	const LunaSamplerCreationInfo linearNoRepeatSamplerCreateInfo = {
+	const LunaSamplerCreationInfo linearNoRepeatSamplerNoAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_LINEAR,
 		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipmapLodBias = -1.5f,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestNoRepeatSamplerNoAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -296,24 +375,22 @@ bool CreateTextureSamplers()
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 
-	const LunaSamplerCreationInfo nearestNoRepeatSamplerCreateInfo = {
-		.magFilter = VK_FILTER_NEAREST,
-		.minFilter = VK_FILTER_NEAREST,
-		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipmapLodBias = -1.5f,
-		.maxLod = VK_LOD_CLAMP_NONE,
-	};
-	VulkanTest(lunaCreateSampler(&linearRepeatSamplerCreateInfo, &textureSamplers.linearRepeat),
-			   "Failed to create linear repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerCreateInfo, &textureSamplers.nearestRepeat),
-			   "Failed to create nearest repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerCreateInfo, &textureSamplers.linearNoRepeat),
-			   "Failed to create linear non-repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerCreateInfo, &textureSamplers.nearestNoRepeat),
-			   "Failed to create nearest non-repeating texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearRepeatSamplerAnisotropyCreateInfo, &textureSamplers.linearRepeatAnisotropy),
+			   "Failed to create linear repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerAnisotropyCreateInfo, &textureSamplers.nearestRepeatAnisotropy),
+			   "Failed to create nearest repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerAnisotropyCreateInfo, &textureSamplers.linearNoRepeatAnisotropy),
+			   "Failed to create linear non-repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerAnisotropyCreateInfo, &textureSamplers.nearestNoRepeatAnisotropy),
+			   "Failed to create nearest non-repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.linearRepeatNoAnisotropy),
+			   "Failed to create linear repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.nearestRepeatNoAnisotropy),
+			   "Failed to create nearest repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.linearNoRepeatNoAnisotropy),
+			   "Failed to create linear non-repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.nearestNoRepeatNoAnisotropy),
+			   "Failed to create nearest non-repeating no anisotropy texture sampler!");
 
 	ListInit(textures, LIST_POINTER);
 	memset(imageAssetIdToIndexMap, -1, sizeof(*imageAssetIdToIndexMap) * MAX_TEXTURES);
