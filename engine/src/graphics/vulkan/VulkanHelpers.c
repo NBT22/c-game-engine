@@ -35,10 +35,8 @@
 bool minimized = false;
 VkExtent2D swapChainExtent = {0};
 VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-LockingList textures = {0};
+LunaRenderPass renderPass = LUNA_NULL_HANDLE;
 uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
-LunaDescriptorSetLayout descriptorSetLayout = LUNA_NULL_HANDLE;
-LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
 TextureSamplers textureSamplers = {
 	.linearRepeatAnisotropy = LUNA_NULL_HANDLE,
 	.nearestRepeatAnisotropy = LUNA_NULL_HANDLE,
@@ -49,17 +47,12 @@ TextureSamplers textureSamplers = {
 	.linearNoRepeatNoAnisotropy = LUNA_NULL_HANDLE,
 	.nearestNoRepeatNoAnisotropy = LUNA_NULL_HANDLE,
 };
+LockingList textures = {0};
+LunaDescriptorSetLayout descriptorSetLayout = LUNA_NULL_HANDLE;
+LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
 PushConstants pushConstants = {0};
-LunaRenderPass renderPass = LUNA_NULL_HANDLE;
 Pipelines pipelines = {
 	.ui = LUNA_NULL_HANDLE,
-	.viewModel = LUNA_NULL_HANDLE,
-	.sky = LUNA_NULL_HANDLE,
-	.floorAndCeiling = LUNA_NULL_HANDLE,
-	.walls = LUNA_NULL_HANDLE,
-	.actorWalls = LUNA_NULL_HANDLE,
-	.shadedActorModels = LUNA_NULL_HANDLE,
-	.unshadedActorModels = LUNA_NULL_HANDLE,
 #ifdef JPH_DEBUG_RENDERER
 	.debugDrawLines = LUNA_NULL_HANDLE,
 	.debugDrawTriangles = LUNA_NULL_HANDLE,
@@ -68,19 +61,6 @@ Pipelines pipelines = {
 Buffers buffers = {
 	.ui.vertices.allocatedSize = sizeof(UiVertex) * 4 * MAX_UI_QUADS_INIT,
 	.ui.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_UI_QUADS_INIT,
-	.sky.vertices.allocatedSize = 0,
-	.sky.indices.allocatedSize = 0,
-	.walls.vertices.allocatedSize = sizeof(WallVertex) * 4 * MAX_WALLS_INIT,
-	.walls.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_WALLS_INIT,
-	.actorWalls.vertices.allocatedSize = sizeof(ActorWallVertex) * 4 * MAX_WALL_ACTORS_INIT,
-	.actorWalls.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_WALL_ACTORS_INIT,
-	.actorWalls.instanceData.allocatedSize = sizeof(ActorWallInstanceData) * MAX_WALL_ACTORS_INIT,
-	.actorWalls.drawInfo.allocatedSize = sizeof(VkDrawIndexedIndirectCommand) * MAX_WALL_ACTORS_INIT,
-	.actorModels.vertices.allocatedSize = sizeof(ModelVertex) * 4 * MAX_MODEL_ACTOR_QUADS_INIT,
-	.actorModels.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_MODEL_ACTOR_QUADS_INIT,
-	.actorModels.instanceData.allocatedSize = sizeof(ModelInstanceData) * MAX_MODEL_ACTOR_QUADS_INIT,
-	.actorModels.shadedDrawInfo.allocatedSize = sizeof(VkDrawIndexedIndirectCommand) * MAX_MODEL_ACTOR_QUADS_INIT,
-	.actorModels.unshadedDrawInfo.allocatedSize = sizeof(VkDrawIndexedIndirectCommand) * MAX_MODEL_ACTOR_QUADS_INIT,
 #ifdef JPH_DEBUG_RENDERER
 	.debugDrawLines.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
 	.debugDrawTriangles.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
@@ -135,157 +115,16 @@ inline uint32_t ImageIndex(const Image *image)
 
 VkResult LoadSky(const ModelDefinition *skyModel)
 {
-	buffers.sky.vertices.bytesUsed = sizeof(SkyVertex) * skyModel->lods[0]->vertexCount;
-	buffers.sky.indices.bytesUsed = sizeof(uint32_t) * skyModel->lods[0]->totalIndexCount;
-	if (buffers.sky.vertices.allocatedSize == 0 || buffers.sky.indices.allocatedSize == 0)
-	{
-		assert(buffers.sky.vertices.allocatedSize == 0 && buffers.sky.indices.allocatedSize == 0);
-		const LunaBufferCreationInfo vertexBufferCreationInfo = {
-			.size = buffers.sky.vertices.bytesUsed,
-			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &buffers.sky.vertices.buffer),
-							   "Failed to create sky vertex buffer!");
-		buffers.sky.vertices.data = malloc(buffers.sky.vertices.bytesUsed);
-		CheckAlloc(buffers.sky.vertices.data);
-		buffers.sky.vertices.allocatedSize = buffers.sky.vertices.bytesUsed;
-
-		const LunaBufferCreationInfo indexBufferCreationInfo = {
-			.size = buffers.sky.indices.bytesUsed,
-			.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&indexBufferCreationInfo, &buffers.sky.indices.buffer),
-							   "Failed to create sky index buffer!");
-		buffers.sky.indices.data = malloc(buffers.sky.indices.bytesUsed);
-		CheckAlloc(buffers.sky.indices.data);
-		buffers.sky.indices.allocatedSize = buffers.sky.indices.bytesUsed;
-	} else if (buffers.sky.vertices.allocatedSize < buffers.sky.vertices.bytesUsed ||
-			   buffers.sky.indices.allocatedSize < buffers.sky.indices.bytesUsed)
-	{
-		lunaDestroyBuffer(buffers.sky.vertices.buffer);
-		const LunaBufferCreationInfo vertexBufferCreationInfo = {
-			.size = buffers.sky.vertices.bytesUsed,
-			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &buffers.sky.vertices.buffer),
-							   "Failed to recreate sky vertex buffer!");
-		void *newVertices = realloc(buffers.sky.vertices.data, buffers.sky.vertices.bytesUsed);
-		CheckAlloc(newVertices);
-		buffers.sky.vertices.data = newVertices;
-		buffers.sky.vertices.allocatedSize = buffers.sky.vertices.bytesUsed;
-
-		lunaDestroyBuffer(buffers.sky.indices.buffer);
-		const LunaBufferCreationInfo indexBufferCreationInfo = {
-			.size = buffers.sky.indices.bytesUsed,
-			.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&indexBufferCreationInfo, &buffers.sky.indices.buffer),
-							   "Failed to recreate sky index buffer!");
-		void *newIndices = realloc(buffers.sky.indices.data, buffers.sky.indices.bytesUsed);
-		CheckAlloc(newIndices);
-		buffers.sky.indices.data = newIndices;
-		buffers.sky.indices.allocatedSize = buffers.sky.indices.bytesUsed;
-	}
-
-
-	SkyVertex *vertices = buffers.sky.vertices.data;
-	uint32_t *indices = buffers.sky.indices.data;
-	for (uint32_t i = 0; i < skyModel->lods[0]->vertexCount; i++)
-	{
-		// Copy {x, y, z, u, v} and discard {r, g, b, a, nx, ny, nz}
-		memcpy(&vertices[i], skyModel->lods[0]->vertexData + i * 12, sizeof(float) * 5);
-	}
-	buffers.sky.indexCount = 0;
-	for (uint32_t i = 0; i < skyModel->materialsPerSkin; i++)
-	{
-		memcpy(indices + buffers.sky.indexCount,
-			   skyModel->lods[0]->indexData[i],
-			   sizeof(uint32_t) * skyModel->lods[0]->indexCount[i]);
-		buffers.sky.indexCount += skyModel->lods[0]->indexCount[i];
-	}
-	const LunaBufferWriteInfo vertexBufferWriteInfo = {
-		.bytes = buffers.sky.vertices.bytesUsed,
-		.data = vertices,
-		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	};
-	lunaWriteDataToBuffer(buffers.sky.vertices.buffer, &vertexBufferWriteInfo);
-	const LunaBufferWriteInfo indexBufferWriteInfo = {
-		.bytes = buffers.sky.indices.bytesUsed,
-		.data = indices,
-		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	};
-	lunaWriteDataToBuffer(buffers.sky.indices.buffer, &indexBufferWriteInfo);
-
+	(void)skyModel;
 	return VK_SUCCESS;
 }
 
 void LoadWalls(const Map *level)
 {
 	(void)level;
-	// WallVertex *vertices = buffers.walls.vertices.data;
-	// uint32_t *indices = buffers.walls.indices.data;
-	//
-	// for (uint32_t i = 0; i < level->walls.length; i++)
-	// {
-	// 	const Wall *wall = ListGetPointer(level->walls, i);
-	// 	const vec2 startVertex = {(float)wall->a.x, (float)wall->a.y};
-	// 	const vec2 endVertex = {(float)wall->b.x, (float)wall->b.y};
-	// 	const vec2 startUV = {wall->uvOffset, 0};
-	// 	const vec2 endUV = {(float)(wall->uvScale * wall->length + wall->uvOffset), 1};
-	//
-	// 	vertices[4 * i].position.x = startVertex[0];
-	// 	vertices[4 * i].position.y = 0.5f;
-	// 	vertices[4 * i].position.z = startVertex[1];
-	// 	vertices[4 * i].u = startUV[0];
-	// 	vertices[4 * i].v = startUV[1];
-	// 	vertices[4 * i].textureIndex = TextureIndex(wall->tex);
-	// 	vertices[4 * i].wallAngle = (float)wall->angle;
-	//
-	// 	vertices[4 * i + 1].position.x = endVertex[0];
-	// 	vertices[4 * i + 1].position.y = 0.5f;
-	// 	vertices[4 * i + 1].position.z = endVertex[1];
-	// 	vertices[4 * i + 1].u = endUV[0];
-	// 	vertices[4 * i + 1].v = startUV[1];
-	// 	vertices[4 * i + 1].textureIndex = TextureIndex(wall->tex);
-	// 	vertices[4 * i + 1].wallAngle = (float)wall->angle;
-	//
-	// 	vertices[4 * i + 2].position.x = endVertex[0];
-	// 	vertices[4 * i + 2].position.y = -0.5f;
-	// 	vertices[4 * i + 2].position.z = endVertex[1];
-	// 	vertices[4 * i + 2].u = endUV[0];
-	// 	vertices[4 * i + 2].v = endUV[1];
-	// 	vertices[4 * i + 2].textureIndex = TextureIndex(wall->tex);
-	// 	vertices[4 * i + 2].wallAngle = (float)wall->angle;
-	//
-	// 	vertices[4 * i + 3].position.x = startVertex[0];
-	// 	vertices[4 * i + 3].position.y = -0.5f;
-	// 	vertices[4 * i + 3].position.z = startVertex[1];
-	// 	vertices[4 * i + 3].u = startUV[0];
-	// 	vertices[4 * i + 3].v = endUV[1];
-	// 	vertices[4 * i + 3].textureIndex = TextureIndex(wall->tex);
-	// 	vertices[4 * i + 3].wallAngle = (float)wall->angle;
-	//
-	// 	indices[6 * i] = i * 4;
-	// 	indices[6 * i + 1] = i * 4 + 1;
-	// 	indices[6 * i + 2] = i * 4 + 2;
-	// 	indices[6 * i + 3] = i * 4;
-	// 	indices[6 * i + 4] = i * 4 + 2;
-	// 	indices[6 * i + 5] = i * 4 + 3;
-	// }
-	// const LunaBufferWriteInfo vertexBufferWriteInfo = {
-	// 	.bytes = buffers.walls.vertices.bytesUsed,
-	// 	.data = vertices,
-	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	// };
-	// lunaWriteDataToBuffer(buffers.walls.vertices.buffer, &vertexBufferWriteInfo);
-	// const LunaBufferWriteInfo indexBufferWriteInfo = {
-	// 	.bytes = buffers.walls.indices.bytesUsed,
-	// 	.data = indices,
-	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	// };
-	// lunaWriteDataToBuffer(buffers.walls.indices.buffer, &indexBufferWriteInfo);
 }
 
+// TODO: Make sure this doesn't need changes
 void UpdateTransformMatrix(const Camera *camera)
 {
 	mat4 perspectiveMatrix;
@@ -308,7 +147,7 @@ void UpdateTransformMatrix(const Camera *camera)
 	glm_mat4_mul(perspectiveMatrix, viewMatrix, pushConstants.transformMatrix);
 }
 
-// TODO: This positions the model slightly differently than OpenGL does
+// TODO: Update this
 void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 {
 	mat4 perspectiveMatrix;
@@ -334,16 +173,16 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	glm_mat4_mul(translationMatrix, rotationMatrix, translationMatrix);
 	glm_mat4_mul(perspectiveMatrix, translationMatrix, viewModelMatrix);
 
-	for (uint32_t i = 0; i < buffers.viewModel.drawCount; i++)
-	{
-		memcpy(buffers.viewModel.instanceDatas[i].transform, viewModelMatrix, sizeof(mat4));
-	}
-	const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
-		.bytes = sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
-		.data = buffers.viewModel.instanceDatas,
-		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	};
-	lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
+	// for (uint32_t i = 0; i < buffers.viewModel.drawCount; i++)
+	// {
+	// 	memcpy(buffers.viewModel.instanceDatas[i].transform, viewModelMatrix, sizeof(mat4));
+	// }
+	// const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
+	// 	.bytes = sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
+	// 	.data = buffers.viewModel.instanceDatas,
+	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+	// };
+	// lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
 }
 
 void EnsureSpaceForUiElements(const size_t vertexCount, const size_t indexCount)

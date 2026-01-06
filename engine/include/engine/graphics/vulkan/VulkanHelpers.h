@@ -24,11 +24,12 @@
 
 #pragma region macros
 #define MAX_FRAMES_IN_FLIGHT 1
-#define MAX_UI_QUADS_INIT 8192 // TODO: find best value (and a fix for resizing the buffer mid-frame)
-#define MAX_WALLS_INIT 1024
-#define MAX_WALL_ACTORS_INIT 1
-#define MAX_MODEL_ACTOR_QUADS_INIT 1
+
+#define MAX_UI_QUADS_INIT 8192 // TODO: Ensure this is a good value for GGUI
+
+#ifdef JPH_DEBUG_RENDERER
 #define MAX_DEBUG_DRAW_VERTICES_INIT 1024
+#endif
 
 #define VulkanLogError(...) LogInternal("VULKAN", 31, true, __VA_ARGS__)
 // TODO Use LogInternal
@@ -104,81 +105,13 @@ typedef struct UiVertex
 	uint32_t textureIndex;
 } UiVertex;
 
-typedef struct ModelVertex
-{
-	/// The position of the vertex in local space
-	Vector3 position;
-
-	/// The u component of the vertex's uv
-	float u;
-	/// The v component of the vertex's uv
-	float v;
-
-	/// The color of the vertex
-	Color color;
-
-	/// The normal of the vertex
-	Vector3 normal;
-} ModelVertex;
-
-typedef struct ModelInstanceData
-{
-	/// The instance's transformation matrix.
-	mat4 transform;
-	/// The instance's texture index.
-	uint32_t textureIndex;
-	/// The color of the instance, given by the material
-	Color materialColor;
-	/// The color of the instance, specified per-instance (such as by Actor::modColor)
-	Color instanceColor;
-} ModelInstanceData;
-
-typedef struct SkyVertex
-{
-	Vector3 position;
-
-	float u;
-	float v;
-} SkyVertex;
-
-typedef struct WallVertex
-{
-	Vector3 position;
-
-	float u;
-	float v;
-
-	uint32_t textureIndex; // TODO Per-vertex is less than ideal
-	float wallAngle;
-} WallVertex;
-
-typedef struct ActorWallVertex
-{
-	/// The position of the vertex in local space
-	Vector3 position;
-
-	/// The u component of the vertex's uv
-	float u;
-	/// The v component of the vertex's uv
-	float v;
-} ActorWallVertex;
-
-typedef struct ActorWallInstanceData
-{
-	/// The instance's transformation matrix.
-	mat4 transform;
-	/// The instance's texture index.
-	uint32_t textureIndex;
-	/// The instance's rotation.
-	float wallAngle;
-} ActorWallInstanceData;
-
 typedef struct DebugDrawVertex
 {
 	Vector3 position;
 	Color color;
 } DebugDrawVertex;
 
+// TODO: Should this be changed, even for UI?
 typedef struct BufferRegion
 {
 	LunaBuffer buffer;
@@ -194,64 +127,18 @@ typedef struct UiBuffer
 	bool shouldResize;
 } UiBuffer;
 
-typedef struct ViewModelBuffer
-{
-	LunaBuffer vertices;
-	LunaBuffer indices;
-	LunaBuffer instanceDataBuffer;
-	ModelInstanceData *instanceDatas;
-	LunaBuffer drawInfo;
-	uint32_t drawCount;
-} ViewModelBuffer;
-
-typedef struct SkyBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-	uint32_t indexCount;
-} SkyBuffer;
-
-typedef struct WallsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-} WallsBuffer;
-
-typedef struct ActorWallsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-	BufferRegion instanceData;
-	BufferRegion drawInfo;
-	VkDeviceSize count;
-} ActorWallsBuffer;
-
-typedef struct ActorModelsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-	BufferRegion instanceData;
-	BufferRegion shadedDrawInfo;
-	BufferRegion unshadedDrawInfo;
-
-	List loadedModelIds;
-} ActorModelsBuffer;
-
+#ifdef JPH_DEBUG_RENDERER
 typedef struct DebugDrawBuffer
 {
 	BufferRegion vertices;
 	uint32_t vertexCount;
 	bool shouldResize;
 } DebugDrawBuffer;
+#endif
 
 typedef struct Buffers
 {
 	UiBuffer ui;
-	ViewModelBuffer viewModel;
-	SkyBuffer sky;
-	WallsBuffer walls;
-	ActorWallsBuffer actorWalls;
-	ActorModelsBuffer actorModels;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -261,13 +148,6 @@ typedef struct Buffers
 typedef struct Pipelines
 {
 	LunaGraphicsPipeline ui;
-	LunaGraphicsPipeline viewModel;
-	LunaGraphicsPipeline sky;
-	LunaGraphicsPipeline floorAndCeiling;
-	LunaGraphicsPipeline walls;
-	LunaGraphicsPipeline actorWalls;
-	LunaGraphicsPipeline shadedActorModels;
-	LunaGraphicsPipeline unshadedActorModels;
 #ifdef JPH_DEBUG_RENDERER
 	LunaGraphicsPipeline debugDrawLines;
 	LunaGraphicsPipeline debugDrawTriangles;
@@ -286,32 +166,35 @@ typedef struct TextureSamplers
 	LunaSampler nearestNoRepeatNoAnisotropy;
 } TextureSamplers;
 
+// TODO: In isolated testing there was improved performance from using a descriptor rather than using push constants, even for just the transform matrix
 typedef struct __attribute__((aligned(16))) PushConstants
 {
+	// Note: These are updated based on the design doc for the rewrite
 	mat4 transformMatrix;
 	Color fogColor;
-	Vector3 cameraPosition;
-	uint32_t roofTextureIndex;
-	uint32_t floorTextureIndex;
-	float yaw;
 	float fogStart;
 	float fogEnd;
+	Color lightingColor;
+	float lightingDirection;
 } PushConstants;
 #pragma endregion typedefs
 
 #pragma region variables
+// TODO: Make sure these are all needed and are all as they should be
+
 extern bool minimized;
 extern VkExtent2D swapChainExtent;
 extern VkSampleCountFlagBits msaaSamples;
-extern LockingList textures;
+extern LunaRenderPass renderPass;
 extern uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
+extern TextureSamplers textureSamplers;
+extern LockingList textures;
 extern LunaDescriptorSetLayout descriptorSetLayout;
 extern LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
-extern TextureSamplers textureSamplers;
-extern PushConstants pushConstants;
-extern LunaRenderPass renderPass;
-extern Pipelines pipelines;
+
 extern Buffers buffers;
+extern Pipelines pipelines;
+extern PushConstants pushConstants;
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderModule *shaderModule);

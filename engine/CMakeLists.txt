@@ -114,8 +114,6 @@ target_sources(engine INTERFACE
         include/engine/graphics/RenderingHelpers.h
         src/graphics/vulkan/Vulkan.c
         include/engine/graphics/vulkan/Vulkan.h
-        src/graphics/vulkan/VulkanActors.c
-        include/engine/graphics/vulkan/VulkanActors.h
         src/graphics/vulkan/VulkanHelpers.c
         include/engine/graphics/vulkan/VulkanHelpers.h
         src/graphics/vulkan/VulkanInternal.c

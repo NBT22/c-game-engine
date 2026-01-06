@@ -35,6 +35,7 @@ static VkPhysicalDeviceProperties physicalDeviceProperties;
 bool CreateInstance(SDL_Window *window)
 {
 	vulkanWindow = window;
+
 	uint32_t extensionCount = 0;
 	if (SDL_Vulkan_GetInstanceExtensions(vulkanWindow, &extensionCount, NULL) == SDL_FALSE)
 	{
@@ -47,6 +48,7 @@ bool CreateInstance(SDL_Window *window)
 		VulkanLogError("Failed to acquire extensions required for SDL window!\n");
 		return false;
 	}
+
 	const LunaInstanceCreationInfo instanceCreationInfo = {
 		.apiVersion = VK_API_VERSION_1_2,
 
@@ -75,41 +77,23 @@ bool CreateSurface()
 
 bool CreateLogicalDevice()
 {
-	const VkPhysicalDeviceFeatures vulkan10Features = {
-		.samplerAnisotropy = VK_TRUE,
-		.multiDrawIndirect = VK_TRUE,
-		.drawIndirectFirstInstance = VK_TRUE,
-	};
-	VkPhysicalDeviceVulkan12Features vulkan12Features = {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.descriptorIndexing = VK_TRUE,
-		.runtimeDescriptorArray = VK_TRUE,
-		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
-		.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
-	};
-	const VkPhysicalDeviceFeatures2 requiredFeatures = {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-		.pNext = &vulkan12Features,
-		.features = vulkan10Features,
-	};
 	const LunaPhysicalDevicePreferenceDefinition devicePreferenceDefinition = {
 		.preferredDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
 	};
-	const LunaDeviceCreationInfo2 deviceCreationInfo = {
-		.extensionCount = 3,
-		.extensionNames = (const char *const[]){VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-												"VK_KHR_maintenance3",
-												"VK_EXT_descriptor_indexing"},
-		.requiredFeatures = requiredFeatures,
+	const LunaDeviceCreationInfo deviceCreationInfo = {
+		.extensionCount = 1,
+		.extensionNames = (const char *const[]){VK_KHR_SWAPCHAIN_EXTENSION_NAME},
 		.surface = surface,
 		.physicalDevicePreferenceDefinition = &devicePreferenceDefinition,
 	};
-	VulkanTest(lunaCreateDevice2(&deviceCreationInfo), "Failed to create logical device!");
+	VulkanTest(lunaCreateDevice(&deviceCreationInfo), "Failed to create logical device!");
 	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
 	assert(sizeof(PushConstants) <= physicalDeviceProperties.limits.maxPushConstantsSize);
+	// TODO: Additional checks, and change from assert to a failure that allows GL to take over
 	return true;
 }
 
+// TODO: In-depth review of this function, or rewrite from the ground up
 bool CreateSwapchain()
 {
 	if (minimized)
@@ -204,10 +188,12 @@ bool CreateRenderPass()
 			msaaSamples >>= 1;
 			if (msaaSamples == 0)
 			{
-				VulkanLogError("Found device does not support sampling the image even once.");
+				VulkanLogError("Found device does not support sampling the image even once. "
+							   "This indicates an issue with the graphics driver.");
 				return false;
 			}
 		}
+		// TODO: This doesn't update the options and it doesn't tell the user what to change their MSAA level to
 		ShowWarning("Invalid Settings",
 					"Your GPU driver does not support the selected MSAA level!\n"
 					"A fallback has been set to avoid issues.");
@@ -218,6 +204,7 @@ bool CreateRenderPass()
 		.useColorAttachment = true,
 		.useDepthAttachment = true,
 	};
+	// TODO: Check that these stages are actually accurate
 	VkSubpassDependency dependency = {
 		.srcSubpass = VK_SUBPASS_EXTERNAL,
 		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -244,6 +231,7 @@ bool CreateRenderPass()
 	return true;
 }
 
+// TODO: Look into using uniform texel buffers instead of image samplers to drop dependency on non-uniform indexing
 bool CreateDescriptorSetLayouts()
 {
 	const LunaDescriptorSetLayoutBinding binding = {
@@ -381,15 +369,19 @@ bool CreateTextureSamplers()
 			   "Failed to create nearest repeating anisotropy texture sampler!");
 	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerAnisotropyCreateInfo, &textureSamplers.linearNoRepeatAnisotropy),
 			   "Failed to create linear non-repeating anisotropy texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerAnisotropyCreateInfo, &textureSamplers.nearestNoRepeatAnisotropy),
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerAnisotropyCreateInfo,
+								 &textureSamplers.nearestNoRepeatAnisotropy),
 			   "Failed to create nearest non-repeating anisotropy texture sampler!");
 	VulkanTest(lunaCreateSampler(&linearRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.linearRepeatNoAnisotropy),
 			   "Failed to create linear repeating no anisotropy texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.nearestRepeatNoAnisotropy),
+	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.nearestRepeatNoAnisotropy),
 			   "Failed to create nearest repeating no anisotropy texture sampler!");
-	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.linearNoRepeatNoAnisotropy),
+	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.linearNoRepeatNoAnisotropy),
 			   "Failed to create linear non-repeating no anisotropy texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.nearestNoRepeatNoAnisotropy),
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.nearestNoRepeatNoAnisotropy),
 			   "Failed to create nearest non-repeating no anisotropy texture sampler!");
 
 	ListInit(textures, LIST_POINTER);
@@ -401,15 +393,11 @@ bool CreateTextureSamplers()
 bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
-	VulkanTest(CreateViewModelBuffers(), "Failed to create view model buffers!");
-	VulkanTest(CreateWallBuffers(), "Failed to create wall buffers!");
-	VulkanTest(CreateActorWallBuffers(), "Failed to create wall actor buffers!");
-	VulkanTest(CreateActorModelBuffers(), "Failed to create model actor buffers!");
-	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;
 }
 
+// TODO: Revisit this to ensure it's as it should be (update after bind flag or usage of MAX_FRAMES_IN_FLIGHT, for example)
 bool CreateDescriptorSets()
 {
 	LunaDescriptorPool descriptorPool = LUNA_NULL_HANDLE;

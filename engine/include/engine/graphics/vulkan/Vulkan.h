@@ -44,16 +44,12 @@ bool VK_Init(SDL_Window *window);
 
 bool VK_LoadLevelWalls(const Map *level);
 
-/// Update actors
-bool VK_UpdateActors(const LockingList *actors, bool shouldReloadActors); // This is implemented in VulkanActors.c
+bool VK_UpdateActors(const LockingList *actors, bool shouldReloadActors);
 
-//TODO document me
 VkResult VK_FrameStart();
 
-//TODO document me
 VkResult VK_RenderLevel(const Map *level, const Camera *camera, const Viewmodel *viewmodel);
 
-//TODO document me
 VkResult VK_FrameEnd();
 
 /// A function used to destroy the Vulkan objects when they are no longer needed.

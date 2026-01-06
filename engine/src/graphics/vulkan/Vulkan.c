@@ -9,7 +9,6 @@
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/Drawing.h>
 #include <engine/graphics/vulkan/Vulkan.h>
-#include <engine/graphics/vulkan/VulkanActors.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanInternal.h>
 #include <engine/graphics/vulkan/VulkanResources.h>
@@ -41,8 +40,10 @@
 #include <engine/subsystem/Error.h>
 #endif
 
-static const Map *loadedLevel;
-static uint8_t currentFrame;
+// TODO: Can the concept of frames in flight be removed entirely in favor of simply letting Luna handle it?
+
+/// Notably not a frame counter, this is just the index used for determining which of the in-flight frames is active
+static uint8_t currentFrameIndex;
 
 bool VK_Init(SDL_Window *window)
 {
@@ -53,8 +54,6 @@ bool VK_Init(SDL_Window *window)
 		CreateDescriptorSets() && CreateBuffers())
 	{
 		// clang-format on
-
-		VulkanActorsVariablesInit();
 
 		VkPhysicalDeviceProperties physicalDeviceProperties;
 		lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
@@ -113,35 +112,15 @@ bool VK_Init(SDL_Window *window)
 
 bool VK_LoadLevelWalls(const Map *level)
 {
-	VulkanTest(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky!");
+	return true;
+}
 
-	// pushConstants.roofTextureIndex = TextureIndex(level->ceilOrSkyTex);
-	// pushConstants.floorTextureIndex = TextureIndex(level->floorTex);
+bool VK_UpdateActors(const LockingList *actors, const bool shouldReloadActors)
+{
+	// TODO: Implement this
 
-	pushConstants.fogStart = (float)level->fogStart;
-	pushConstants.fogEnd = (float)level->fogEnd;
-	pushConstants.fogColor = COLOR(level->fogColor);
-
-	// buffers.walls.vertices.bytesUsed = sizeof(WallVertex) * 4 * level->walls.length;
-	// buffers.walls.indices.bytesUsed = sizeof(uint32_t) * 6 * level->walls.length;
-	// VulkanTest(ResizeWallBuffers(), "Failed to resize wall buffers!");
-	// LoadWalls(level);
-
-	if (LockLodThreadMutex() != 0)
-	{
-		LogError("Failed to lock LOD thread mutex with error: %s", SDL_GetError());
-		return false;
-	}
-	loadedLevel = level;
-	if (!VK_UpdateActors(&level->actors, true))
-	{
-		VulkanLogError("Failed to load actors!");
-	}
-	if (UnlockLodThreadMutex() != 0)
-	{
-		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
-		return false;
-	}
+	(void)actors;
+	(void)shouldReloadActors;
 	return true;
 }
 
@@ -185,313 +164,6 @@ VkResult VK_FrameStart()
 
 VkResult VK_RenderLevel(const Map *level, const Camera *camera, const Viewmodel *viewmodel)
 {
-	if (loadedLevel != level)
-	{
-		if (!VK_LoadLevelWalls(level))
-		{
-			return VK_ERROR_UNKNOWN;
-		}
-	}
-	pushConstants.cameraPosition.x = (float)camera->transform.position.x;
-	pushConstants.cameraPosition.y = (float)camera->transform.position.y;
-	pushConstants.cameraPosition.z = (float)camera->transform.position.z;
-	pushConstants.yaw = JPH_Quat_GetRotationAngle(&camera->transform.rotation, &Vector3_AxisY) + 1.5f * PIf;
-	UpdateTransformMatrix(camera);
-
-	if (LockLodThreadMutex() != 0)
-	{
-		LogError("Failed to lock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
-
-	VulkanTestReturnResult(lunaPushConstants(pipelines.walls), "Failed to push constants!");
-
-	const VkViewport viewport = {
-		.width = (float)swapChainExtent.width,
-		.height = (float)swapChainExtent.height,
-		.maxDepth = 1,
-	};
-	const LunaViewportBindInfo viewportBindInfo = {
-		.viewportCount = 1,
-		.viewports = &viewport,
-	};
-	const VkRect2D scissor = {
-		.extent = swapChainExtent,
-	};
-	const LunaScissorBindInfo scissorBindInfo = {
-		.scissorCount = 1,
-		.scissors = &scissor,
-	};
-	const LunaDynamicStateBindInfo dynamicStateBindInfos[] = {
-		{
-			.dynamicStateType = VK_DYNAMIC_STATE_VIEWPORT,
-			.bindInfo.viewportBindInfo = &viewportBindInfo,
-		},
-		{
-			.dynamicStateType = VK_DYNAMIC_STATE_SCISSOR,
-			.bindInfo.scissorBindInfo = &scissorBindInfo,
-		},
-	};
-	const LunaGraphicsPipelineBindInfo pipelineBindInfo = {
-		.descriptorSetBindInfo.descriptorSetCount = 1,
-		.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrame],
-		.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
-		.dynamicStates = dynamicStateBindInfos,
-	};
-
-#ifdef JPH_DEBUG_RENDERER
-	if (buffers.debugDrawLines.shouldResize || buffers.debugDrawTriangles.shouldResize)
-	{
-		VulkanTestReturnResult(ResizeDebugDrawBuffers(), "Failed to resize debug draw buffer!");
-	}
-	if (true) // not has ceiling
-	{
-		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.sky.vertices.buffer,
-													 buffers.sky.indices.buffer,
-													 VK_INDEX_TYPE_UINT32,
-													 pipelines.sky,
-													 &pipelineBindInfo,
-													 buffers.sky.indexCount,
-													 1,
-													 0,
-													 0,
-													 0),
-							   "Failed to draw sky!");
-#ifdef JPH_DEBUG_RENDERER_WIREFRAME
-		VulkanTestReturnResult(lunaDrawBuffer(NULL, pipelines.floorAndCeiling, &pipelineBindInfo, 6, 1, 0, 0),
-							   "Failed to draw floor!");
-	}
-
-	if (false) // has ceiling
-	{
-		VulkanTestReturnResult(lunaDrawBuffer(NULL, pipelines.floorAndCeiling, &pipelineBindInfo, 12, 1, 0, 0),
-							   "Failed to draw floor and ceiling!");
-	}
-	if (buffers.walls.indices.bytesUsed)
-	{
-		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.walls.vertices.buffer,
-													 buffers.walls.indices.buffer,
-													 VK_INDEX_TYPE_UINT32,
-													 pipelines.walls,
-													 &pipelineBindInfo,
-													 buffers.walls.indices.bytesUsed / sizeof(uint32_t),
-													 1,
-													 0,
-													 0,
-													 0),
-							   "Failed to draw walls!");
-	}
-#else
-	}
-#endif
-	if (buffers.debugDrawLines.vertexCount)
-	{
-		lunaWriteDataToBuffer(buffers.debugDrawLines.vertices.buffer,
-							  buffers.debugDrawLines.vertices.data,
-							  buffers.debugDrawLines.vertices.bytesUsed,
-							  0);
-		VulkanTestReturnResult(lunaDrawBuffer(buffers.debugDrawLines.vertices.buffer,
-											  pipelines.debugDrawLines,
-											  &pipelineBindInfo,
-											  buffers.debugDrawLines.vertexCount,
-											  1,
-											  0,
-											  0),
-							   "Failed to draw Jolt debug renderer lines!");
-	}
-	if (buffers.debugDrawTriangles.vertexCount)
-	{
-		lunaWriteDataToBuffer(buffers.debugDrawTriangles.vertices.buffer,
-							  buffers.debugDrawTriangles.vertices.data,
-							  buffers.debugDrawTriangles.vertices.bytesUsed,
-							  0);
-		VulkanTestReturnResult(lunaDrawBuffer(buffers.debugDrawTriangles.vertices.buffer,
-											  pipelines.debugDrawTriangles,
-											  &pipelineBindInfo,
-											  buffers.debugDrawTriangles.vertexCount,
-											  1,
-											  0,
-											  0),
-							   "Failed to draw Jolt debug renderer triangles!");
-	}
-
-	if (buffers.actorWalls.count)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorWalls.vertices.buffer,
-											 buffers.actorWalls.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorWalls.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.actorWalls,
-															 &pipelineBindInfo,
-															 buffers.actorWalls.drawInfo.buffer,
-															 0,
-															 buffers.actorWalls.count,
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw wall actors!");
-	}
-
-	if (buffers.actorModels.shadedDrawInfo.bytesUsed)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorModels.vertices.buffer,
-											 buffers.actorModels.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorModels.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.shadedActorModels,
-															 &pipelineBindInfo,
-															 buffers.actorModels.shadedDrawInfo.buffer,
-															 0,
-															 buffers.actorModels.shadedDrawInfo.bytesUsed /
-																	 sizeof(VkDrawIndexedIndirectCommand),
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw shaded model actors!");
-	}
-	if (buffers.actorModels.unshadedDrawInfo.bytesUsed)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorModels.vertices.buffer,
-											 buffers.actorModels.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorModels.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.unshadedActorModels,
-															 &pipelineBindInfo,
-															 buffers.actorModels.unshadedDrawInfo.buffer,
-															 0,
-															 buffers.actorModels.unshadedDrawInfo.bytesUsed /
-																	 sizeof(VkDrawIndexedIndirectCommand),
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw unshaded model actors!");
-	}
-#else
-	VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.sky.vertices.buffer,
-												 buffers.sky.indices.buffer,
-												 VK_INDEX_TYPE_UINT32,
-												 pipelines.sky,
-												 &pipelineBindInfo,
-												 buffers.sky.indexCount,
-												 1,
-												 0,
-												 0,
-												 0),
-						   "Failed to draw sky!");
-	VulkanTestReturnResult(lunaDrawBuffer(NULL, pipelines.floorAndCeiling, &pipelineBindInfo, 6, 1, 0, 0),
-						   "Failed to draw floor!");
-
-	if (buffers.walls.indices.bytesUsed)
-	{
-		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.walls.vertices.buffer,
-													 buffers.walls.indices.buffer,
-													 VK_INDEX_TYPE_UINT32,
-													 pipelines.walls,
-													 &pipelineBindInfo,
-													 buffers.walls.indices.bytesUsed / sizeof(uint32_t),
-													 1,
-													 0,
-													 0,
-													 0),
-							   "Failed to draw walls!");
-	}
-
-	if (buffers.actorWalls.count)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorWalls.vertices.buffer,
-											 buffers.actorWalls.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorWalls.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.actorWalls,
-															 &pipelineBindInfo,
-															 buffers.actorWalls.drawInfo.buffer,
-															 0,
-															 buffers.actorWalls.count,
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw wall actors!");
-	}
-
-	if (buffers.actorModels.shadedDrawInfo.bytesUsed)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorModels.vertices.buffer,
-											 buffers.actorModels.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorModels.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.shadedActorModels,
-															 &pipelineBindInfo,
-															 buffers.actorModels.shadedDrawInfo.buffer,
-															 0,
-															 buffers.actorModels.shadedDrawInfo.bytesUsed /
-																	 sizeof(VkDrawIndexedIndirectCommand),
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw shaded model actors!");
-	}
-	if (buffers.actorModels.unshadedDrawInfo.bytesUsed)
-	{
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.actorModels.vertices.buffer,
-											 buffers.actorModels.instanceData.buffer},
-							  (VkDeviceSize[]){0, 0});
-
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.actorModels.indices.buffer,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.unshadedActorModels,
-															 &pipelineBindInfo,
-															 buffers.actorModels.unshadedDrawInfo.buffer,
-															 0,
-															 buffers.actorModels.unshadedDrawInfo.bytesUsed /
-																	 sizeof(VkDrawIndexedIndirectCommand),
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw unshaded model actors!");
-	}
-
-	if (viewmodel->enabled)
-	{
-		UpdateViewModelMatrix(viewmodel);
-		lunaBindVertexBuffers(0,
-							  2,
-							  (LunaBuffer[]){buffers.viewModel.vertices, buffers.viewModel.instanceDataBuffer},
-							  (VkDeviceSize[]){0, 0});
-		VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(NULL,
-															 buffers.viewModel.indices,
-															 VK_INDEX_TYPE_UINT32,
-															 pipelines.viewModel,
-															 &pipelineBindInfo,
-															 buffers.viewModel.drawInfo,
-															 0,
-															 buffers.viewModel.drawCount,
-															 sizeof(VkDrawIndexedIndirectCommand)),
-							   "Failed to draw view model!");
-	}
-#endif
-
-	if (UnlockLodThreadMutex() != 0)
-	{
-		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
-
 	return VK_SUCCESS;
 }
 
@@ -570,7 +242,7 @@ VkResult VK_FrameEnd()
 		};
 		const LunaGraphicsPipelineBindInfo pipelineBindInfo = {
 			.descriptorSetBindInfo.descriptorSetCount = 1,
-			.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrame],
+			.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrameIndex],
 			.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
 			.dynamicStates = dynamicStateBindInfos,
 		};
@@ -595,7 +267,7 @@ VkResult VK_FrameEnd()
 		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
 		return VK_ERROR_UNKNOWN;
 	}
-	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+	currentFrameIndex = (currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 
 	return VK_SUCCESS;
 }
@@ -604,23 +276,8 @@ bool VK_Cleanup()
 {
 	LogDebug("Cleaning up Vulkan renderer...\n");
 	VulkanTest(lunaDestroyInstance(), "Cleanup failed!");
-	VulkanActorsVariablesCleanup();
 	free(buffers.ui.vertices.data);
 	free(buffers.ui.indices.data);
-	free(buffers.viewModel.instanceDatas);
-	free(buffers.sky.vertices.data);
-	free(buffers.sky.indices.data);
-	free(buffers.walls.vertices.data);
-	free(buffers.walls.indices.data);
-	free(buffers.actorWalls.vertices.data);
-	free(buffers.actorWalls.indices.data);
-	free(buffers.actorWalls.instanceData.data);
-	free(buffers.actorWalls.drawInfo.data);
-	free(buffers.actorModels.vertices.data);
-	free(buffers.actorModels.indices.data);
-	free(buffers.actorModels.instanceData.data);
-	free(buffers.actorModels.shadedDrawInfo.data);
-	free(buffers.actorModels.unshadedDrawInfo.data);
 
 	return true;
 }
