@@ -28,6 +28,6 @@ bool CreateTextureSamplers();
 
 bool CreateBuffers();
 
-bool CreateDescriptorSets();
+bool CreateDescriptorSet();
 
 #endif //VULKANINTERNAL_H

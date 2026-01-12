@@ -24,110 +24,89 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
-/**
- * A helper function which creates the underlying @c LunaBuffer for a given @c BufferRegion,
- *  with the size of the buffer given by the @c allocatedSize field on the buffer region
- * @param bufferRegion A pointer to the buffer region that should have a buffer created for it
- * @param usage The usage flags of the buffer to create
- * @return @c VK_SUCCESS if the buffer region was successfully created, or a meaningful result code otherwise
- */
-static inline VkResult CreateBufferRegion(BufferRegion *bufferRegion, const VkBufferUsageFlags usage)
-{
-	const LunaBufferCreationInfo vertexBufferCreationInfo = {
-		.size = bufferRegion->allocatedSize,
-		.usage = usage,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &bufferRegion->buffer),
-						   "Failed to create buffer region!");
-
-	return VK_SUCCESS;
-}
-
-/**
- * A helper function which creates the underlying @c LunaBuffer and @c data pointer for a given @c BufferRegionWithData,
- *  with the size of the buffer and data pointer allocation given by the @c allocatedSize field on the buffer region
- * @param bufferRegion A pointer to the buffer region that should have a buffer and data pointer created for it
- * @param usage The usage flags of the buffer to create
- * @return @c VK_SUCCESS if the buffer region and data pointer were successfully created,
- *          or a meaningful result code otherwise
- */
-static inline VkResult CreateBufferRegionWithData(BufferRegionWithData *bufferRegion, const VkBufferUsageFlags usage)
-{
-	const LunaBufferCreationInfo vertexBufferCreationInfo = {
-		.size = bufferRegion->allocatedSize,
-		.usage = usage,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &bufferRegion->buffer),
-						   "Failed to create buffer region with data!");
-	bufferRegion->data = malloc(bufferRegion->allocatedSize);
-	CheckAlloc(bufferRegion->data);
-
-	return VK_SUCCESS;
-}
-
-/**
- * A helper function which resizes a @c BufferRegion struct to fit the @c bytesUsed field.
- * @note Resizing a buffer is typically a slow operation, since most of the time the data will have to be copied from
- *        one place to another within VRAM, rather than just extending the current block.
- * @param bufferRegion A pointer to the buffer region that should be resized
- * @return @c VK_SUCCESS of the buffer region was successfully resized, or a meaningful result code otherwise
- */
-static inline VkResult ResizeBufferRegion(BufferRegion *bufferRegion)
-{
-	if (bufferRegion->allocatedSize < bufferRegion->bytesUsed)
-	{
-		VulkanTestReturnResult(lunaResizeBuffer(&bufferRegion->buffer, bufferRegion->bytesUsed),
-							   "Failed to resize buffer region!");
-		bufferRegion->allocatedSize = bufferRegion->bytesUsed;
-	}
-
-	return VK_SUCCESS;
-}
-
-/**
- * A helper function which resizes a @c BufferRegionWithData struct to fit the @c bytesUsed field. This resizes both the
- *  buffer, as well as the @c data pointer.
- * @note Resizing a buffer is typically a slow operation, since most of the time the data will have to be copied from
- *        one place to another within VRAM, rather than just extending the current block.
- * @param bufferRegion A pointer to the buffer region that should be resized
- * @return @c VK_SUCCESS of the buffer region was successfully resized, or a meaningful result code otherwise
- */
-static inline VkResult ResizeBufferRegionWithData(BufferRegionWithData *bufferRegion)
-{
-	if (bufferRegion->allocatedSize < bufferRegion->bytesUsed)
-	{
-		VulkanTestReturnResult(lunaResizeBuffer(&bufferRegion->buffer, bufferRegion->bytesUsed),
-							   "Failed to resize buffer region with data!");
-		bufferRegion->allocatedSize = bufferRegion->bytesUsed;
-	}
-
-	void *newData = realloc(bufferRegion->data, bufferRegion->allocatedSize);
-	CheckAlloc(newData);
-	bufferRegion->data = newData;
-
-	return VK_SUCCESS;
-}
-
 VkResult CreateUiBuffers()
 {
-	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.ui.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+	static const uint32_t MAX_UI_QUADS_INIT = 8192; // TODO: Ensure this is a good value for GGUI
+
+	buffers.ui.allocatedQuads = 0;
+	buffers.ui.freeQuads = MAX_UI_QUADS_INIT;
+
+	const size_t vertexBufferAllocationSize = MAX_UI_QUADS_INIT * 4 * sizeof(UiVertex);
+	const LunaBufferCreationInfo vertexBufferCreationInfo = {
+		.size = vertexBufferAllocationSize,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &buffers.ui.vertexBuffer),
 						   "Failed to create UI vertex buffer!");
-	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.ui.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
+	buffers.ui.vertexData = malloc(vertexBufferAllocationSize);
+	CheckAlloc(buffers.ui.vertexData);
+
+	const size_t indexBufferAllocationSize = MAX_UI_QUADS_INIT * 6 * sizeof(uint32_t);
+	const LunaBufferCreationInfo indexBufferCreationInfo = {
+		.size = indexBufferAllocationSize,
+		.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&indexBufferCreationInfo, &buffers.ui.indexBuffer),
 						   "Failed to create UI index buffer!");
+	buffers.ui.indexData = malloc(indexBufferAllocationSize);
+	CheckAlloc(buffers.ui.indexData);
 
 	return VK_SUCCESS;
 }
 
 VkResult CreateMapBuffers()
 {
-	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+	static const uint32_t MAX_MAP_TRIANGLES_PER_MAT_INIT = 1024;
+	static const uint32_t MAX_MAP_MATERIALS_INIT = 16;
+
+	const LunaBufferCreationInfo verticesBufferCreationInfo = {
+		.size = sizeof(MapVertex) * 3 * MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&verticesBufferCreationInfo, &buffers.map.vertices),
 						   "Failed to create map vertex buffer!");
-	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.perMaterialData, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+	const LunaBufferCreationInfo perMaterialBufferCreationInfo = {
+		.size = sizeof(uint32_t) * MAX_MAP_MATERIALS_INIT,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&perMaterialBufferCreationInfo, &buffers.map.perMaterial),
 						   "Failed to create map per-material data buffer!");
-	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
+	const LunaBufferCreationInfo indicesBufferCreationInfo = {
+		.size = sizeof(uint32_t) * 3 * MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
+		.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&indicesBufferCreationInfo, &buffers.map.indices),
 						   "Failed to create map index buffer!");
-	VulkanTestReturnResult(CreateBufferRegion(&buffers.map.drawInfo, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT),
+	const LunaBufferCreationInfo drawInfoBufferCreationInfo = {
+		.size = sizeof(VkDrawIndexedIndirectCommand) * MAX_MAP_MATERIALS_INIT,
+		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&drawInfoBufferCreationInfo, &buffers.map.drawInfo),
 						   "Failed to create map draw info buffer!");
+
+	return VK_SUCCESS;
+}
+
+VkResult CreateUniformBuffers()
+{
+	const LunaBufferCreationInfo transformMatrixBufferCreationInfo = {
+		.size = sizeof(mat4),
+		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&transformMatrixBufferCreationInfo, &buffers.uniforms.transformMatrix),
+						   "Failed to create transform matrix uniform buffer!");
+	const LunaBufferCreationInfo lightingBufferCreationInfo = {
+		.size = sizeof(float) * 7, // r, g, b, a, x, y, z
+		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&lightingBufferCreationInfo, &buffers.uniforms.lighting),
+						   "Failed to create lighting uniform buffer!");
+	const LunaBufferCreationInfo fogBufferCreationInfo = {
+		.size = sizeof(Color) + sizeof(float) * 2, // fogColor, fogStart, fogEnd
+		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&fogBufferCreationInfo, &buffers.uniforms.fog),
+						   "Failed to create fog uniform buffer!");
 
 	return VK_SUCCESS;
 }
@@ -135,24 +114,24 @@ VkResult CreateMapBuffers()
 VkResult CreateDebugDrawBuffers()
 {
 #ifdef JPH_DEBUG_RENDERER
-	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.debugDrawLines.vertices,
-													  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+	const LunaBufferCreationInfo linesVertexBuffer = {
+		.size = buffers.debugDrawLines.vertices.allocatedSize,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&linesVertexBuffer, &buffers.debugDrawLines.vertices.buffer),
 						   "Failed to create debug draw lines buffer!");
-	VulkanTestReturnResult(CreateBufferRegionWithData(&buffers.debugDrawTriangles.vertices,
-													  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+	buffers.debugDrawLines.vertices.data = malloc(buffers.debugDrawLines.vertices.allocatedSize);
+	CheckAlloc(buffers.debugDrawLines.vertices.data);
+
+	const LunaBufferCreationInfo vertexVertexBuffer = {
+		.size = buffers.debugDrawTriangles.vertices.allocatedSize,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&vertexVertexBuffer, &buffers.debugDrawTriangles.vertices.buffer),
 						   "Failed to create debug draw triangles buffer!");
+	buffers.debugDrawTriangles.vertices.data = malloc(buffers.debugDrawTriangles.vertices.allocatedSize);
+	CheckAlloc(buffers.debugDrawTriangles.vertices.data);
 #endif
-
-	return VK_SUCCESS;
-}
-
-VkResult ResizeMapBuffers()
-{
-	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.vertices), "Failed to resize map vertex buffer!");
-	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.perMaterialData),
-						   "Failed to resize map per-material data buffer!");
-	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.indices), "Failed to resize map index buffer!");
-	VulkanTestReturnResult(ResizeBufferRegion(&buffers.map.drawInfo), "Failed to resize map draw info buffer!");
 
 	return VK_SUCCESS;
 }
@@ -160,11 +139,29 @@ VkResult ResizeMapBuffers()
 VkResult ResizeDebugDrawBuffers()
 {
 #ifdef JPH_DEBUG_RENDERER
-	VulkanTestReturnResult(ResizeBufferRegionWithData(&buffers.debugDrawLines.vertices),
-						   "Failed to resize debug draw lines buffer!");
+	if (buffers.debugDrawLines.vertices.allocatedSize < buffers.debugDrawLines.vertices.bytesUsed)
+	{
+		VulkanTestReturnResult(lunaResizeBuffer(&buffers.debugDrawLines.vertices.buffer,
+												buffers.debugDrawLines.vertices.bytesUsed),
+							   "Failed to resize debug draw lines buffer!");
+		buffers.debugDrawLines.vertices.allocatedSize = buffers.debugDrawLines.vertices.bytesUsed;
+	}
+	void *newData = realloc(buffers.debugDrawLines.vertices.data, buffers.debugDrawLines.vertices.allocatedSize);
+	CheckAlloc(newData);
+	buffers.debugDrawLines.vertices.data = newData;
 	buffers.debugDrawLines.shouldResize = false;
-	VulkanTestReturnResult(ResizeBufferRegionWithData(&buffers.debugDrawTriangles.vertices),
-						   "Failed to resize debug draw triangles buffer!");
+
+	if (buffers.debugDrawTriangles.vertices.allocatedSize < buffers.debugDrawTriangles.vertices.bytesUsed)
+	{
+		VulkanTestReturnResult(lunaResizeBuffer(&buffers.debugDrawTriangles.vertices.buffer,
+												buffers.debugDrawTriangles.vertices.bytesUsed),
+							   "Failed to resize debug draw triangles buffer!");
+		buffers.debugDrawTriangles.vertices.allocatedSize = buffers.debugDrawTriangles.vertices.bytesUsed;
+	}
+
+	newData = realloc(buffers.debugDrawTriangles.vertices.data, buffers.debugDrawTriangles.vertices.allocatedSize);
+	CheckAlloc(newData);
+	buffers.debugDrawTriangles.vertices.data = newData;
 	buffers.debugDrawTriangles.shouldResize = false;
 #endif
 
@@ -207,7 +204,7 @@ bool LoadTexture(const Image *image)
 		.writeInfo.destinationAccessMask = VK_ACCESS_SHADER_READ_BIT,
 		.sampler = sampler,
 	};
-	LunaImage lunaImage = VK_NULL_HANDLE;
+	LunaImage lunaImage = LUNA_NULL_HANDLE;
 	const size_t index = textures.length;
 	VulkanTest(lunaCreateImage(&imageCreationInfo, &lunaImage), "Failed to create texture!");
 	imageAssetIdToIndexMap[image->id] = index;
@@ -217,18 +214,14 @@ bool LoadTexture(const Image *image)
 		.image = lunaImage,
 		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	};
-	LunaWriteDescriptorSet writeDescriptors[MAX_FRAMES_IN_FLIGHT];
-	for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		writeDescriptors[i] = (LunaWriteDescriptorSet){
-			.descriptorSet = descriptorSets[i],
-			.bindingName = "Textures",
-			.descriptorArrayElement = index,
-			.descriptorCount = 1,
-			.imageInfo = &imageInfo,
-		};
-	}
-	lunaWriteDescriptorSets(MAX_FRAMES_IN_FLIGHT, writeDescriptors);
+	const LunaWriteDescriptorSet writeDescriptor = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Textures",
+		.descriptorArrayElement = index,
+		.descriptorCount = 1,
+		.imageInfo = &imageInfo,
+	};
+	lunaWriteDescriptorSets(1, &writeDescriptor);
 	UnlockLodThreadMutex();
 
 	return true;

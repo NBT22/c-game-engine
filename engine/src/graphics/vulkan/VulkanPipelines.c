@@ -16,7 +16,6 @@
 
 // TODO: This probably won't change much since pipelines are really just a lot of boilerplate,
 //  but make sure to go through and add documentation as well as ensuring there aren't any cut corners left in.
-//  This also means actually fixing the const static variables being initialized with a non-constant expression.
 
 #pragma region shared
 static const VkPipelineViewportStateCreateInfo viewportState = {
@@ -77,16 +76,9 @@ static const VkPipelineColorBlendStateCreateInfo colorBlending = {
 	.attachmentCount = 1,
 	.pAttachments = &colorBlendAttachment,
 };
-static const LunaPushConstantsRange pushConstantRange = {
-	.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-	.size = sizeof(PushConstants),
-	.dataPointer = &pushConstants,
-};
-static const LunaPipelineLayoutCreationInfo pipelineLayoutCreationInfo = {
+
+static LunaPipelineLayoutCreationInfo pipelineLayoutCreationInfo = {
 	.descriptorSetLayoutCount = 1,
-	.descriptorSetLayouts = &descriptorSetLayout,
-	.pushConstantRangeCount = 1,
-	.pushConstantsRanges = &pushConstantRange,
 };
 
 static const VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
@@ -183,9 +175,9 @@ bool CreateMapPipeline()
 {
 	LunaShaderModule vertShaderModule = LUNA_NULL_HANDLE;
 	LunaShaderModule fragShaderModule = LUNA_NULL_HANDLE;
-	VulkanTest(CreateShaderModule(SHADER("vulkan/map_v"), SHADER_TYPE_VERT, &vertShaderModule),
+	VulkanTest(CreateShaderModule(SHADER("vulkan/map_shaded_v"), SHADER_TYPE_VERT, &vertShaderModule),
 			   "Failed to load map vertex shader!");
-	VulkanTest(CreateShaderModule(SHADER("vulkan/map_f"), SHADER_TYPE_FRAG, &fragShaderModule),
+	VulkanTest(CreateShaderModule(SHADER("vulkan/map_shaded_f"), SHADER_TYPE_FRAG, &fragShaderModule),
 			   "Failed to load map fragment shader!");
 
 	const LunaPipelineShaderStageCreationInfo shaderStages[] = {
@@ -363,6 +355,7 @@ bool CreateDebugDrawPipeline()
 bool CreateGraphicsPipelines()
 {
 	multisampling.rasterizationSamples = msaaSamples;
+	pipelineLayoutCreationInfo.descriptorSetLayouts = &descriptorSetLayout;
 
 	// clang-format off
 	return CreateUIPipeline() && CreateMapPipeline() && CreateDebugDrawPipeline();

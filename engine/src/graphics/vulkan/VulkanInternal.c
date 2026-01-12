@@ -83,6 +83,7 @@ bool CreateLogicalDevice()
 	const VkPhysicalDeviceFeatures vulkan10Features = {
 		.samplerAnisotropy = VK_TRUE,
 		.multiDrawIndirect = VK_TRUE,
+		.drawIndirectFirstInstance = VK_TRUE,
 	};
 	VkPhysicalDeviceVulkan12Features vulkan12Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
@@ -104,7 +105,6 @@ bool CreateLogicalDevice()
 	};
 	VulkanTest(lunaCreateDevice2(&deviceCreationInfo), "Failed to create logical device!");
 	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
-	assert(sizeof(PushConstants) <= physicalDeviceProperties.limits.maxPushConstantsSize);
 	// TODO: Additional checks, and change from assert to a failure that allows GL to take over
 	return true;
 }
@@ -250,17 +250,38 @@ bool CreateRenderPass()
 // TODO: Look into using uniform texel buffers instead of image samplers to drop dependency on non-uniform indexing
 bool CreateDescriptorSetLayouts()
 {
-	const LunaDescriptorSetLayoutBinding binding = {
-		.bindingName = "Textures",
-		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = MAX_TEXTURES,
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+	// TODO: Use inline uniform block if available
+	const LunaDescriptorSetLayoutBinding bindings[] = {
+		{
+			.bindingName = "Textures",
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_TEXTURES,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+		},
+		{
+			.bindingName = "Transform Matrix",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		},
+		{
+			.bindingName = "Global Lighting",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		},
+		{
+			.bindingName = "Fog",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	};
 	const LunaDescriptorSetLayoutCreationInfo descriptorSetLayoutCreationInfo = {
-		.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-		.bindingCount = 1,
-		.bindings = &binding,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+		.bindingCount = sizeof(bindings) / sizeof(*bindings),
+		.bindings = bindings,
 	};
 	VulkanTest(lunaCreateDescriptorSetLayout(&descriptorSetLayoutCreationInfo, &descriptorSetLayout),
 			   "Failed to create pipeline descriptor set layout!");
@@ -410,39 +431,70 @@ bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
 	VulkanTest(CreateMapBuffers(), "Failed to create map buffers!");
+	VulkanTest(CreateUniformBuffers(), "Failed to create uniform buffers!");
 	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;
 }
 
 // TODO: Revisit this to ensure it's as it should be (update after bind flag or usage of MAX_FRAMES_IN_FLIGHT, for example)
-bool CreateDescriptorSets()
+bool CreateDescriptorSet()
 {
 	LunaDescriptorPool descriptorPool = LUNA_NULL_HANDLE;
-	const VkDescriptorPoolSize poolSize = {
-		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = MAX_TEXTURES * MAX_FRAMES_IN_FLIGHT,
+	const VkDescriptorPoolSize poolSizes[] = {
+		{
+			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_TEXTURES,
+		},
+		{
+			.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 3,
+		},
 	};
 	const LunaDescriptorPoolCreationInfo descriptorPoolCreationInfo = {
 		.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-		.maxSets = MAX_FRAMES_IN_FLIGHT,
-		.poolSizeCount = 1,
-		.poolSizes = &poolSize,
+		.maxSets = 1,
+		.poolSizeCount = sizeof(poolSizes) / sizeof(*poolSizes),
+		.poolSizes = poolSizes,
 	};
 	VulkanTest(lunaCreateDescriptorPool(&descriptorPoolCreationInfo, &descriptorPool),
 			   "Failed to create descriptor pool!");
 
-	LunaDescriptorSetLayout layouts[MAX_FRAMES_IN_FLIGHT];
-	for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		layouts[i] = descriptorSetLayout;
-	}
 	const LunaDescriptorSetAllocationInfo allocationInfo = {
 		.descriptorPool = descriptorPool,
-		.descriptorSetCount = MAX_FRAMES_IN_FLIGHT,
-		.setLayouts = layouts,
+		.descriptorSetCount = 1,
+		.setLayouts = &descriptorSetLayout,
 	};
-	VulkanTest(lunaAllocateDescriptorSets(&allocationInfo, descriptorSets), "Failed to allocate descriptor sets!");
+	VulkanTest(lunaAllocateDescriptorSets(&allocationInfo, &descriptorSet), "Failed to allocate descriptor sets!");
+
+	const LunaDescriptorBufferInfo transformMatrixBufferInfo = {
+		.buffer = buffers.uniforms.transformMatrix,
+	};
+	const LunaWriteDescriptorSet transformMatrixWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Transform Matrix",
+		.descriptorCount = 1,
+		.bufferInfo = &transformMatrixBufferInfo,
+	};
+	const LunaDescriptorBufferInfo lightingBufferInfo = {
+		.buffer = buffers.uniforms.lighting,
+	};
+	const LunaWriteDescriptorSet lightingWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Global Lighting",
+		.descriptorCount = 1,
+		.bufferInfo = &lightingBufferInfo,
+	};
+	const LunaDescriptorBufferInfo fogBufferInfo = {
+		.buffer = buffers.uniforms.fog,
+	};
+	const LunaWriteDescriptorSet fogWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Fog",
+		.descriptorCount = 1,
+		.bufferInfo = &fogBufferInfo,
+	};
+	lunaWriteDescriptorSets(3, (LunaWriteDescriptorSet[]){transformMatrixWrite, lightingWrite, fogWrite});
 
 	return true;
 }

@@ -45,8 +45,13 @@ TextureSamplers textureSamplers = {
 };
 LockingList textures = {0};
 LunaDescriptorSetLayout descriptorSetLayout = LUNA_NULL_HANDLE;
-LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
-PushConstants pushConstants = {0};
+LunaDescriptorSet descriptorSet;
+Buffers buffers = {
+#ifdef JPH_DEBUG_RENDERER
+	.debugDrawLines.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
+	.debugDrawTriangles.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
+#endif
+};
 Pipelines pipelines = {
 	.ui = LUNA_NULL_HANDLE,
 #ifdef JPH_DEBUG_RENDERER
@@ -54,23 +59,7 @@ Pipelines pipelines = {
 	.debugDrawTriangles = LUNA_NULL_HANDLE,
 #endif
 };
-#define MAX_UI_QUADS_INIT 8192 // TODO: Ensure this is a good value for GGUI
-#define MAX_MAP_TRIANGLES_PER_MAT_INIT 1024
-#define MAX_MAP_MATERIALS_INIT 16
-Buffers buffers = {
-	.ui.vertices.allocatedSize = sizeof(UiVertex) * 4 * MAX_UI_QUADS_INIT,
-	.ui.indices.allocatedSize = sizeof(uint32_t) * 6 * MAX_UI_QUADS_INIT,
-
-	.map.vertices.allocatedSize = sizeof(MapVertex) * 3 *  MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
-	.map.perMaterialData.allocatedSize = sizeof(uint32_t) * MAX_MAP_MATERIALS,
-	.map.indices.allocatedSize = sizeof(uint32_t) * 3 *  MAX_MAP_TRIANGLES_PER_MAT_INIT * MAX_MAP_MATERIALS_INIT,
-	.map.drawInfo.allocatedSize = sizeof(VkDrawIndexedIndirectCommand) * MAX_MAP_MATERIALS,
-
-#ifdef JPH_DEBUG_RENDERER
-	.debugDrawLines.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
-	.debugDrawTriangles.vertices.allocatedSize = sizeof(DebugDrawVertex) * MAX_DEBUG_DRAW_VERTICES_INIT,
-#endif
-};
+uint32_t pendingTasks = 0;
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, const ShaderType shaderType, LunaShaderModule *shaderModule)
@@ -119,7 +108,7 @@ inline uint32_t ImageIndex(const Image *image)
 }
 
 // TODO: Make sure this doesn't need changes
-void UpdateTransformMatrix(const Camera *camera)
+VkResult UpdateTransformMatrix(const Camera *camera)
 {
 	mat4 perspectiveMatrix;
 	glm_perspective_lh_zo(glm_rad(camera->fov),
@@ -138,7 +127,17 @@ void UpdateTransformMatrix(const Camera *camera)
 	mat4 viewMatrix;
 	glm_quat_look(cameraPosition, rotationQuat, viewMatrix);
 
-	glm_mat4_mul(perspectiveMatrix, viewMatrix, pushConstants.transformMatrix);
+	mat4 transformMatrix;
+	glm_mat4_mul(perspectiveMatrix, viewMatrix, transformMatrix);
+	const LunaBufferWriteInfo bufferWriteInfo = {
+		.bytes = sizeof(mat4),
+		.data = transformMatrix,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.uniforms.transformMatrix, &bufferWriteInfo),
+						   "Failed to write transform matrix!");
+
+	return VK_SUCCESS;
 }
 
 // TODO: Update this
@@ -179,22 +178,22 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	// lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
 }
 
-void EnsureSpaceForUiElements(const size_t vertexCount, const size_t indexCount)
+void EnsureSpaceForUiElements(const size_t quadCount)
 {
-	if (buffers.ui.vertices.allocatedSize < buffers.ui.vertices.bytesUsed + sizeof(UiVertex) * vertexCount ||
-		buffers.ui.indices.allocatedSize < buffers.ui.indices.bytesUsed + sizeof(uint32_t) * indexCount)
+	if (buffers.ui.freeQuads < quadCount)
 	{
-		buffers.ui.vertices.allocatedSize += sizeof(UiVertex) * vertexCount * 16;
-		buffers.ui.indices.allocatedSize += sizeof(uint32_t) * indexCount * 16;
-		buffers.ui.shouldResize = true;
+		buffers.ui.freeQuads += quadCount + 16;
+		buffers.ui.allocatedQuads += quadCount + 16;
 
-		UiVertex *newVertices = realloc(buffers.ui.vertices.data, buffers.ui.vertices.allocatedSize);
+		pendingTasks |= PENDING_TASK_UI_BUFFERS_RESIZE_BIT;
+
+		UiVertex *newVertices = realloc(buffers.ui.vertexData, buffers.ui.allocatedQuads * 4 * sizeof(UiVertex));
 		CheckAlloc(newVertices);
-		buffers.ui.vertices.data = newVertices;
+		buffers.ui.vertexData = newVertices;
 
-		uint32_t *newIndices = realloc(buffers.ui.indices.data, buffers.ui.indices.allocatedSize);
+		uint32_t *newIndices = realloc(buffers.ui.indexData, buffers.ui.allocatedQuads * 6 * sizeof(uint32_t));
 		CheckAlloc(newIndices);
-		buffers.ui.indices.data = newIndices;
+		buffers.ui.indexData = newIndices;
 	}
 }
 
@@ -220,10 +219,11 @@ void DrawRectInternal(const float ndcStartX,
 
 void DrawQuadInternal(const mat4 vertices_posXY_uvZW, const Color *color, const uint32_t textureIndex)
 {
-	EnsureSpaceForUiElements(4, 6);
+	EnsureSpaceForUiElements(1);
 
-	UiVertex *vertices = buffers.ui.vertices.data + buffers.ui.vertices.bytesUsed;
-	uint32_t *indices = buffers.ui.indices.data + buffers.ui.indices.bytesUsed;
+	const size_t vertexOffset = (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 4;
+	UiVertex *vertices = buffers.ui.vertexData + vertexOffset;
+	uint32_t *indices = buffers.ui.indexData + (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6;
 
 	vertices[0] = (UiVertex){
 		.x = vertices_posXY_uvZW[0][0],
@@ -270,7 +270,6 @@ void DrawQuadInternal(const mat4 vertices_posXY_uvZW, const Color *color, const 
 		.textureIndex = textureIndex,
 	};
 
-	const size_t vertexOffset = buffers.ui.vertices.bytesUsed / sizeof(UiVertex);
 	indices[0] = vertexOffset;
 	indices[1] = vertexOffset + 1;
 	indices[2] = vertexOffset + 2;
@@ -278,6 +277,5 @@ void DrawQuadInternal(const mat4 vertices_posXY_uvZW, const Color *color, const 
 	indices[4] = vertexOffset + 2;
 	indices[5] = vertexOffset + 3;
 
-	buffers.ui.vertices.bytesUsed += sizeof(UiVertex) * 4;
-	buffers.ui.indices.bytesUsed += sizeof(uint32_t) * 6;
+	buffers.ui.freeQuads--;
 }

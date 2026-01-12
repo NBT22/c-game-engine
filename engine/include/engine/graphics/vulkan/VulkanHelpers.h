@@ -23,8 +23,6 @@
 #include <vulkan/vulkan_core.h>
 
 #pragma region macros
-#define MAX_FRAMES_IN_FLIGHT 1
-
 #ifdef JPH_DEBUG_RENDERER
 #define MAX_DEBUG_DRAW_VERTICES_INIT 1024
 #endif
@@ -87,6 +85,11 @@ enum VendorIDs
 	QUALCOMM = 0x5143,
 };
 
+enum PendingTasksBitFlags
+{
+	PENDING_TASK_UI_BUFFERS_RESIZE_BIT = 1 << 0,
+};
+
 typedef struct UiVertex
 {
 	float x;
@@ -109,46 +112,47 @@ typedef struct DebugDrawVertex
 	Color color;
 } DebugDrawVertex;
 
-// TODO: Should this be changed, even for UI?
-typedef struct BufferRegion
+typedef struct UniformBuffers
 {
-	LunaBuffer buffer;
-	VkDeviceSize bytesUsed;
-	VkDeviceSize allocatedSize;
-} BufferRegion;
-
-typedef struct BufferRegionWithData
-{
-	LunaBuffer buffer;
-	VkDeviceSize bytesUsed;
-	VkDeviceSize allocatedSize;
-	void *data;
-} BufferRegionWithData;
+	LunaBuffer transformMatrix;
+	LunaBuffer lighting;
+	LunaBuffer fog;
+} UniformBuffers;
 
 typedef struct UiBuffer
 {
-	BufferRegionWithData vertices;
-	BufferRegionWithData indices;
-	bool shouldResize;
+	LunaBuffer vertexBuffer;
+	LunaBuffer indexBuffer;
+	uint32_t allocatedQuads;
+	uint32_t freeQuads;
+	UiVertex *vertexData;
+	uint32_t *indexData;
 } UiBuffer;
 
 /// Contains all the information needed to keep track of the required buffers for the map models
 typedef struct MapBuffer
 {
 	/// A buffer containing per-vertex data
-	BufferRegion vertices;
+	LunaBuffer vertices;
 	/// A buffer containing data that only needs to exist once per-material
-	BufferRegion perMaterialData;
+	LunaBuffer perMaterial;
 	/// A buffer containing the index data to use along-side the per-vertex data
-	BufferRegion indices;
+	LunaBuffer indices;
 	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the indirect draw call
-	BufferRegion drawInfo;
+	LunaBuffer drawInfo;
 } MapBuffer;
 
 #ifdef JPH_DEBUG_RENDERER
+// TODO: Clean up both this and the whole system
 typedef struct DebugDrawBuffer
 {
-	BufferRegionWithData vertices;
+	struct
+	{
+		LunaBuffer buffer;
+		VkDeviceSize bytesUsed;
+		VkDeviceSize allocatedSize;
+		void *data;
+	} vertices;
 	uint32_t vertexCount;
 	bool shouldResize;
 } DebugDrawBuffer;
@@ -158,6 +162,7 @@ typedef struct Buffers
 {
 	UiBuffer ui;
 	MapBuffer map;
+	UniformBuffers uniforms;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -186,14 +191,13 @@ typedef struct TextureSamplers
 	LunaSampler nearestNoRepeatNoAnisotropy;
 } TextureSamplers;
 
-// TODO: In isolated testing there was improved performance from using a descriptor rather than using push constants, even for just the transform matrix
-typedef struct PushConstants
+typedef struct DescriptorSetLayouts
 {
-	mat4 transformMatrix;
-	Color lightingColor;
-	Vector3 lightingNormal;
-	alignas(16) float padding; // Pad to align with the GLSL struct
-} PushConstants;
+	LunaDescriptorSetLayout transform;
+	LunaDescriptorSetLayout all;
+	LunaDescriptorSetLayout globalLighting;
+	LunaDescriptorSetLayout fog;
+} DescriptorSetLayouts;
 #pragma endregion typedefs
 
 #pragma region variables
@@ -207,11 +211,11 @@ extern uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
 extern TextureSamplers textureSamplers;
 extern LockingList textures;
 extern LunaDescriptorSetLayout descriptorSetLayout;
-extern LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
+extern LunaDescriptorSet descriptorSet;
 
 extern Buffers buffers;
 extern Pipelines pipelines;
-extern PushConstants pushConstants;
+extern uint32_t pendingTasks; // Bits set with PendingTasksBitFlags
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderModule *shaderModule);
@@ -220,11 +224,11 @@ uint32_t TextureIndex(const char *texture);
 
 uint32_t ImageIndex(const Image *image);
 
-void UpdateTransformMatrix(const Camera *camera);
+VkResult UpdateTransformMatrix(const Camera *camera);
 
 void UpdateViewModelMatrix(const Viewmodel *viewmodel);
 
-void EnsureSpaceForUiElements(size_t vertexCount, size_t indexCount);
+void EnsureSpaceForUiElements(size_t quadCount);
 
 void DrawRectInternal(float ndcStartX,
 					  float ndcStartY,

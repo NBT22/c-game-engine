@@ -39,9 +39,8 @@
 #endif
 
 // TODO: Can the concept of frames in flight be removed entirely in favor of simply letting Luna handle it?
+//  I've started this process, so if it cannot it needs to be readded in several places
 
-/// Notably not a frame counter, this is just the index used for determining which of the in-flight frames is active
-static uint8_t currentFrameIndex;
 static const Map *loadedMap;
 
 /**
@@ -58,29 +57,31 @@ static const Map *loadedMap;
  */
 static inline VkResult LoadMap(const Map *map)
 {
-	buffers.map.vertices.bytesUsed = 0;
-	buffers.map.perMaterialData.bytesUsed = 0;
-	buffers.map.indices.bytesUsed = 0;
-	buffers.map.drawInfo.bytesUsed = 0;
+	size_t totalVertexCount = 0;
+	size_t totalIndexCount = 0;
 	for (size_t i = 0; i < map->modelCount; i++)
 	{
-		buffers.map.vertices.bytesUsed += map->models[i].vertexCount * sizeof(MapVertex);
-		buffers.map.perMaterialData.bytesUsed += sizeof(uint32_t); // uint32_t textureIndex
-		buffers.map.indices.bytesUsed += map->models[i].indexCount * sizeof(uint32_t);
-		buffers.map.drawInfo.bytesUsed += sizeof(VkDrawIndexedIndirectCommand);
+		totalVertexCount += map->models[i].vertexCount;
+		totalIndexCount += map->models[i].indexCount;
 	}
-	VulkanTestReturnResult(ResizeMapBuffers(), "Failed to resize map buffers!");
+	const size_t vertexBufferSize = totalVertexCount * sizeof(MapVertex);
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.map.vertices, vertexBufferSize),
+						   "Failed to resize vertex buffer!");
+	const size_t perMaterialBufferSize = map->modelCount * sizeof(uint32_t);
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.map.perMaterial, perMaterialBufferSize),
+						   "Failed to resize per material data buffer!");
+	const size_t indexBufferSize = totalIndexCount * sizeof(uint32_t);
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.map.indices, indexBufferSize), "Failed to resize index buffer!");
+	const size_t drawInfoBufferSize = map->modelCount * sizeof(VkDrawIndexedIndirectCommand);
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.map.drawInfo, drawInfoBufferSize),
+						   "Failed to resize draw info buffer!");
 
-	// TODO: `vertices`, `indices`, and `drawInfo` get leaked if any of the VulkanTest macros cause us to return early
-	MapVertex *vertices = malloc(buffers.map.vertices.bytesUsed);
-	CheckAlloc(vertices);
+	MapVertex vertices[totalVertexCount];
 	VkDeviceSize vertexCount = 0;
 	uint32_t textureIndices[map->modelCount];
-	uint32_t *indices = malloc(buffers.map.indices.bytesUsed);
-	CheckAlloc(indices);
+	uint32_t indices[totalIndexCount];
 	VkDeviceSize indexCount = 0;
-	VkDrawIndexedIndirectCommand *drawInfo = calloc(map->modelCount, sizeof(VkDrawIndexedIndirectCommand));
-	CheckAlloc(drawInfo);
+	VkDrawIndexedIndirectCommand drawInfo[map->modelCount];
 	for (size_t i = 0; i < map->modelCount; i++)
 	{
 		memcpy(vertices + vertexCount, map->models[i].vertices, map->models[i].vertexCount * sizeof(MapVertex));
@@ -97,37 +98,33 @@ static inline VkResult LoadMap(const Map *map)
 	}
 
 	const LunaBufferWriteInfo vertexBufferWriteInfo = {
-		.bytes = buffers.map.vertices.bytesUsed,
+		.bytes = vertexBufferSize,
 		.data = vertices,
 		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 	};
-	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.vertices.buffer, &vertexBufferWriteInfo),
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.vertices, &vertexBufferWriteInfo),
 						   "Failed to write data to vertex buffer!");
 	const LunaBufferWriteInfo perMaterialDataBufferWriteInfo = {
-		.bytes = buffers.map.perMaterialData.bytesUsed,
+		.bytes = perMaterialBufferSize,
 		.data = textureIndices,
 		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 	};
-	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.perMaterialData.buffer, &perMaterialDataBufferWriteInfo),
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.perMaterial, &perMaterialDataBufferWriteInfo),
 						   "Failed to write data to per-material data buffer!");
 	const LunaBufferWriteInfo indexBufferWriteInfo = {
-		.bytes = buffers.map.indices.bytesUsed,
+		.bytes = indexBufferSize,
 		.data = indices,
 		.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 	};
-	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.indices.buffer, &indexBufferWriteInfo),
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.indices, &indexBufferWriteInfo),
 						   "Failed to write data to index buffer!");
 	const LunaBufferWriteInfo drawInfoBufferWriteInfo = {
-		.bytes = buffers.map.drawInfo.bytesUsed,
+		.bytes = drawInfoBufferSize,
 		.data = drawInfo,
 		.stageFlags = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
 	};
-	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.drawInfo.buffer, &drawInfoBufferWriteInfo),
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.map.drawInfo, &drawInfoBufferWriteInfo),
 						   "Failed to write data to draw info buffer!");
-
-	free(vertices);
-	free(indices);
-	free(drawInfo);
 
 	loadedMap = map;
 
@@ -139,8 +136,8 @@ bool VK_Init(SDL_Window *window)
 	LogDebug("Initializing Vulkan renderer...\n");
 	// clang-format off
 	if (CreateInstance(window) && CreateSurface() && CreateLogicalDevice() && CreateSwapchain() && CreateRenderPass() &&
-		CreateDescriptorSetLayouts() && CreateGraphicsPipelines() && CreateTextureSamplers() &&
-		CreateDescriptorSets() && CreateBuffers())
+		CreateDescriptorSetLayouts() && CreateGraphicsPipelines() && CreateTextureSamplers() && CreateBuffers() &&
+		CreateDescriptorSet())
 	{
 		// clang-format on
 
@@ -234,8 +231,7 @@ VkResult VK_FrameStart()
 		return VK_ERROR_UNKNOWN;
 	}
 
-	buffers.ui.vertices.bytesUsed = 0;
-	buffers.ui.indices.bytesUsed = 0;
+	buffers.ui.freeQuads = buffers.ui.allocatedQuads;
 #ifdef JPH_DEBUG_RENDERER
 	buffers.debugDrawLines.vertexCount = 0;
 	buffers.debugDrawLines.vertices.bytesUsed = 0;
@@ -253,12 +249,23 @@ VkResult VK_RenderMap(const Map *map, const Camera *camera)
 		VulkanTestReturnResult(LoadMap(map), "Failed to load map!");
 	}
 
-	pushConstants.lightingColor = map->lightColor;
-	pushConstants.lightingNormal.x = cosf(map->lightPitch) * sinf(map->lightYaw);
-	pushConstants.lightingNormal.y = sinf(map->lightPitch);
-	pushConstants.lightingNormal.z = -cosf(map->lightPitch) * cosf(map->lightYaw);
-	UpdateTransformMatrix(camera);
-	VulkanTest(lunaPushConstants(pipelines.map), "Failed to push constants for map pipeline!");
+	float lighting[7]; // r, g, b, a, x, y, z
+	lighting[0] = map->lightColor.r;
+	lighting[1] = map->lightColor.g;
+	lighting[2] = map->lightColor.b;
+	lighting[3] = map->lightColor.a;
+	lighting[4] = cosf(map->lightPitch) * sinf(map->lightYaw);
+	lighting[5] = sinf(map->lightPitch);
+	lighting[6] = -cosf(map->lightPitch) * cosf(map->lightYaw);
+	const LunaBufferWriteInfo bufferWriteInfo = {
+		.bytes = sizeof(float) * 7,
+		.data = lighting,
+		.stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+	};
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.uniforms.lighting, &bufferWriteInfo),
+						   "Failed to update lighting data!");
+	VulkanTestReturnResult(UpdateTransformMatrix(camera), "Failed to update transform matrix!");
+	VulkanTestReturnResult(lunaPushConstants(pipelines.map), "Failed to push constants for map pipeline!");
 
 	const VkViewport viewport = {
 		.width = (float)swapChainExtent.width,
@@ -288,63 +295,56 @@ VkResult VK_RenderMap(const Map *map, const Camera *camera)
 	};
 	const LunaGraphicsPipelineBindInfo pipelineBindInfo = {
 		.descriptorSetBindInfo.descriptorSetCount = 1,
-		.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrameIndex],
+		.descriptorSetBindInfo.descriptorSets = &descriptorSet,
 		.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
 		.dynamicStates = dynamicStateBindInfos,
 	};
 
-	lunaBindVertexBuffers(0, 2, (LunaBuffer[]){buffers.map.vertices.buffer, buffers.map.perMaterialData.buffer}, NULL);
-	VulkanTest(lunaDrawBufferIndexedIndirect(NULL,
-											 buffers.map.indices.buffer,
-											 VK_INDEX_TYPE_UINT32,
-											 pipelines.map,
-											 &pipelineBindInfo,
-											 buffers.map.drawInfo.buffer,
-											 0,
-											 map->modelCount,
-											 sizeof(VkDrawIndexedIndirectCommand)),
-			   "Failed to draw map!");
+	lunaBindVertexBuffers(0, 2, (LunaBuffer[]){buffers.map.vertices, buffers.map.perMaterial}, NULL);
+	VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(LUNA_NULL_HANDLE,
+														 buffers.map.indices,
+														 VK_INDEX_TYPE_UINT32,
+														 pipelines.map,
+														 &pipelineBindInfo,
+														 buffers.map.drawInfo,
+														 0,
+														 map->modelCount,
+														 sizeof(VkDrawIndexedIndirectCommand)),
+						   "Failed to draw map!");
 
 	return VK_SUCCESS;
 }
 
 VkResult VK_FrameEnd()
 {
-	if (buffers.ui.shouldResize)
+	if ((pendingTasks & PENDING_TASK_UI_BUFFERS_RESIZE_BIT) == PENDING_TASK_UI_BUFFERS_RESIZE_BIT)
 	{
-		lunaDestroyBuffer(buffers.ui.vertices.buffer);
-		lunaDestroyBuffer(buffers.ui.indices.buffer);
-
-		const LunaBufferCreationInfo vertexBufferCreationInfo = {
-			.size = buffers.ui.vertices.allocatedSize,
-			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&vertexBufferCreationInfo, &buffers.ui.vertices.buffer),
+		VulkanTestReturnResult(lunaResizeBuffer(&buffers.ui.vertexBuffer,
+												buffers.ui.allocatedQuads * 4 * sizeof(UiVertex)),
 							   "Failed to recreate UI vertex buffer!");
-
-		const LunaBufferCreationInfo indexBufferCreationInfo = {
-			.size = buffers.ui.indices.allocatedSize,
-			.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		};
-		VulkanTestReturnResult(lunaCreateBuffer(&indexBufferCreationInfo, &buffers.ui.indices.buffer),
+		VulkanTestReturnResult(lunaResizeBuffer(&buffers.ui.indexBuffer,
+												buffers.ui.allocatedQuads * 6 * sizeof(uint32_t)),
 							   "Failed to recreate UI index buffer!");
 
-		buffers.ui.shouldResize = false;
+		pendingTasks ^= PENDING_TASK_UI_BUFFERS_RESIZE_BIT;
 	}
-	if (buffers.ui.indices.bytesUsed > 0)
+	if (buffers.ui.freeQuads != buffers.ui.allocatedQuads)
 	{
+		// TODO: This write is the cause of the glitching (and crash) when pausing the game
 		const LunaBufferWriteInfo vertexBufferWriteInfo = {
-			.bytes = buffers.ui.vertices.bytesUsed,
-			.data = buffers.ui.vertices.data,
+			.bytes = (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 4 * sizeof(UiVertex),
+			.data = buffers.ui.vertexData,
 			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 		};
 		const LunaBufferWriteInfo indexBufferWriteInfo = {
-			.bytes = buffers.ui.indices.bytesUsed,
-			.data = buffers.ui.indices.data,
+			.bytes = (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6 * sizeof(uint32_t),
+			.data = buffers.ui.indexData,
 			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 		};
-		lunaWriteDataToBuffer(buffers.ui.vertices.buffer, &vertexBufferWriteInfo);
-		lunaWriteDataToBuffer(buffers.ui.indices.buffer, &indexBufferWriteInfo);
+		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.ui.vertexBuffer, &vertexBufferWriteInfo),
+							   "Failed to write UI vertex buffer!");
+		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.ui.indexBuffer, &indexBufferWriteInfo),
+							   "Failed to write UI index buffer!");
 	}
 
 	if (LockLodThreadMutex() != 0)
@@ -353,7 +353,7 @@ VkResult VK_FrameEnd()
 		return VK_ERROR_UNKNOWN;
 	}
 
-	if (buffers.ui.indices.bytesUsed > 0)
+	if (buffers.ui.freeQuads != buffers.ui.allocatedQuads)
 	{
 		const VkViewport viewport = {
 			.width = (float)swapChainExtent.width,
@@ -383,16 +383,16 @@ VkResult VK_FrameEnd()
 		};
 		const LunaGraphicsPipelineBindInfo pipelineBindInfo = {
 			.descriptorSetBindInfo.descriptorSetCount = 1,
-			.descriptorSetBindInfo.descriptorSets = &descriptorSets[currentFrameIndex],
+			.descriptorSetBindInfo.descriptorSets = &descriptorSet,
 			.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
 			.dynamicStates = dynamicStateBindInfos,
 		};
-		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.ui.vertices.buffer,
-													 buffers.ui.indices.buffer,
+		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.ui.vertexBuffer,
+													 buffers.ui.indexBuffer,
 													 VK_INDEX_TYPE_UINT32,
 													 pipelines.ui,
 													 &pipelineBindInfo,
-													 buffers.ui.indices.bytesUsed / sizeof(uint32_t),
+													 (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6,
 													 1,
 													 0,
 													 0,
@@ -408,7 +408,6 @@ VkResult VK_FrameEnd()
 		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
 		return VK_ERROR_UNKNOWN;
 	}
-	currentFrameIndex = (currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 
 	return VK_SUCCESS;
 }
@@ -417,8 +416,8 @@ bool VK_Cleanup()
 {
 	LogDebug("Cleaning up Vulkan renderer...\n");
 	VulkanTest(lunaDestroyInstance(), "Cleanup failed!");
-	free(buffers.ui.vertices.data);
-	free(buffers.ui.indices.data);
+	free(buffers.ui.vertexData);
+	free(buffers.ui.indexData);
 
 	return true;
 }
@@ -631,11 +630,13 @@ void VK_DrawRectOutline(const int32_t x,
 
 void VK_DrawUiTriangles(const UiTriangleArray *triangleArray, const char *texture, const Color color)
 {
-	EnsureSpaceForUiElements(triangleArray->vertexCount, triangleArray->indexCount);
+	// Good enough for now
+	const size_t quadCount = triangleArray->indexCount / 6;
+	EnsureSpaceForUiElements(quadCount);
 
-	UiVertex *vertices = buffers.ui.vertices.data + buffers.ui.vertices.bytesUsed;
-	uint32_t *indices = buffers.ui.indices.data + buffers.ui.indices.bytesUsed;
-	const uint32_t vertexOffset = buffers.ui.vertices.bytesUsed / sizeof(UiVertex);
+	const size_t vertexOffset = (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 4;
+	UiVertex *vertices = buffers.ui.vertexData + vertexOffset;
+	uint32_t *indices = buffers.ui.indexData + (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6;
 
 	for (size_t i = 0; i < triangleArray->vertexCount; i++)
 	{
@@ -651,8 +652,7 @@ void VK_DrawUiTriangles(const UiTriangleArray *triangleArray, const char *textur
 		indices[i] = (*triangleArray->indices)[i] + vertexOffset;
 	}
 
-	buffers.ui.vertices.bytesUsed += triangleArray->vertexCount * sizeof(UiVertex);
-	buffers.ui.indices.bytesUsed += triangleArray->indexCount * sizeof(uint32_t);
+	buffers.ui.freeQuads -= quadCount;
 }
 
 void VK_DrawJoltDebugRendererLine(const Vector3 *from, const Vector3 *to, const uint32_t color)
