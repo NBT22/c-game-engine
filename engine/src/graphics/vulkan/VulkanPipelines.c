@@ -24,18 +24,10 @@ static const VkPipelineViewportStateCreateInfo viewportState = {
 	.scissorCount = 1,
 };
 
-static const VkPipelineRasterizationStateCreateInfo cullingRasterizer = {
+static const VkPipelineRasterizationStateCreateInfo rasterizer = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	.polygonMode = VK_POLYGON_MODE_FILL,
 	.cullMode = VK_CULL_MODE_BACK_BIT,
-	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-	.lineWidth = 1,
-};
-
-static const VkPipelineRasterizationStateCreateInfo nonCullingRasterizer = {
-	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-	.polygonMode = VK_POLYGON_MODE_FILL,
-	.cullMode = VK_CULL_MODE_NONE,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 	.lineWidth = 1,
 };
@@ -158,7 +150,7 @@ bool CreateUIPipeline()
 		.vertexInputState = &vertexInputInfo,
 		.inputAssemblyState = &inputAssembly,
 		.viewportState = &viewportState,
-		.rasterizationState = &cullingRasterizer,
+		.rasterizationState = &rasterizer,
 		.multisampleState = &multisampling,
 		.depthStencilState = &depthStencilStateUnused,
 		.colorBlendState = &colorBlending,
@@ -249,7 +241,7 @@ bool CreateMapPipeline()
 		.vertexInputState = &vertexInputInfo,
 		.inputAssemblyState = &inputAssembly,
 		.viewportState = &viewportState,
-		.rasterizationState = &cullingRasterizer,
+		.rasterizationState = &rasterizer,
 		.multisampleState = &multisampling,
 		.depthStencilState = &depthStencilState,
 		.colorBlendState = &colorBlending,

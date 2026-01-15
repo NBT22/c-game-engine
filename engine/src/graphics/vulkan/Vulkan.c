@@ -300,17 +300,15 @@ VkResult VK_RenderMap(const Map *map, const Camera *camera)
 		.dynamicStates = dynamicStateBindInfos,
 	};
 
-	lunaBindVertexBuffers(0, 2, (LunaBuffer[]){buffers.map.vertices, buffers.map.perMaterial}, NULL);
-	VulkanTestReturnResult(lunaDrawBufferIndexedIndirect(LUNA_NULL_HANDLE,
-														 buffers.map.indices,
-														 VK_INDEX_TYPE_UINT32,
-														 pipelines.map,
-														 &pipelineBindInfo,
-														 buffers.map.drawInfo,
-														 0,
-														 map->modelCount,
-														 sizeof(VkDrawIndexedIndirectCommand)),
-						   "Failed to draw map!");
+	lunaBindVertexBuffers((LunaBuffer[]){buffers.map.vertices, buffers.map.perMaterial}, 0, 2);
+	lunaBindIndexBuffer(buffers.map.indices, VK_INDEX_TYPE_UINT32);
+	const LunaDrawIndexedIndirectInfo drawInfo = {
+		.pipeline = pipelines.map,
+		.pipelineBindInfo = &pipelineBindInfo,
+		.buffer = buffers.map.drawInfo,
+		.drawCount = map->modelCount,
+	};
+	VulkanTestReturnResult(lunaDrawIndexedIndirect(&drawInfo), "Failed to draw map!");
 
 	return VK_SUCCESS;
 }
@@ -319,11 +317,11 @@ VkResult VK_FrameEnd()
 {
 	if ((pendingTasks & PENDING_TASK_UI_BUFFERS_RESIZE_BIT) == PENDING_TASK_UI_BUFFERS_RESIZE_BIT)
 	{
-		VulkanTestReturnResult(lunaResizeBuffer(&buffers.ui.vertexBuffer,
-												buffers.ui.allocatedQuads * 4 * sizeof(UiVertex)),
+		VulkanTestReturnResult(lunaReserveBuffer(&buffers.ui.vertexBuffer,
+												 buffers.ui.allocatedQuads * 4 * sizeof(UiVertex)),
 							   "Failed to recreate UI vertex buffer!");
-		VulkanTestReturnResult(lunaResizeBuffer(&buffers.ui.indexBuffer,
-												buffers.ui.allocatedQuads * 6 * sizeof(uint32_t)),
+		VulkanTestReturnResult(lunaReserveBuffer(&buffers.ui.indexBuffer,
+												 buffers.ui.allocatedQuads * 6 * sizeof(uint32_t)),
 							   "Failed to recreate UI index buffer!");
 
 		pendingTasks ^= PENDING_TASK_UI_BUFFERS_RESIZE_BIT;
@@ -387,16 +385,16 @@ VkResult VK_FrameEnd()
 			.dynamicStateCount = sizeof(dynamicStateBindInfos) / sizeof(*dynamicStateBindInfos),
 			.dynamicStates = dynamicStateBindInfos,
 		};
+		const LunaDrawIndexedInfo drawInfo = {
+			.pipeline = pipelines.ui,
+			.pipelineBindInfo = &pipelineBindInfo,
+			.indexCount = (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6,
+			.instanceCount = 1,
+		};
 		VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.ui.vertexBuffer,
 													 buffers.ui.indexBuffer,
 													 VK_INDEX_TYPE_UINT32,
-													 pipelines.ui,
-													 &pipelineBindInfo,
-													 (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6,
-													 1,
-													 0,
-													 0,
-													 0),
+													 &drawInfo),
 							   "Failed to draw UI!");
 	}
 
