@@ -113,12 +113,12 @@ ModelDefinition *LoadModelInternal(const char *asset)
 		lod->id = lodId;
 		lodId++;
 
-		EXPECT_BYTES(sizeof(float) * 3, bytesRemaining);
+		EXPECT_BYTES(sizeof(float) * 2 + sizeof(size_t), bytesRemaining);
 		offset += sizeof(float); // skip non-squared lod distance
 		lod->distanceSquared = ReadFloat(assetData->data, &offset);
 		lod->vertexCount = ReadSizeT(assetData->data, &offset);
 
-		const size_t vertexDataSize = lod->vertexCount * sizeof(float) * 12;
+		const size_t vertexDataSize = lod->vertexCount * sizeof(ModelVertex);
 		EXPECT_BYTES(vertexDataSize, bytesRemaining);
 		lod->vertexData = malloc(vertexDataSize);
 		CheckAlloc(lod->vertexData);

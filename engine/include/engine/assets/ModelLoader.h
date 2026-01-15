@@ -5,13 +5,13 @@
 #ifndef MODELLOADER_H
 #define MODELLOADER_H
 
+#include <engine/structs/Color.h>
+#include <engine/structs/Vector2.h>
 #include <joltc/joltc.h>
 #include <joltc/Math/Vector3.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include <engine/structs/Color.h>
 
 #define MODEL_ASSET_VERSION 1
 
@@ -21,9 +21,10 @@
 typedef enum ModelShader ModelShader;
 typedef enum CollisionModelType CollisionModelType;
 
-typedef struct ModelDefinition ModelDefinition;
 typedef struct Material Material;
 typedef struct ModelLod ModelLod;
+typedef struct ModelVertex ModelVertex;
+typedef struct ModelDefinition ModelDefinition;
 typedef struct ModelConvexHull ModelConvexHull;
 typedef struct ModelStaticCollider ModelStaticCollider;
 
@@ -60,6 +61,18 @@ struct Material
 	ModelShader shader;
 };
 
+struct ModelVertex
+{
+	/// The position of the vertex, in model space
+	Vector3 position;
+	/// The texture coordinate of the vertex
+	Vector2 uv;
+	/// The color of the vertex
+	Color color;
+	/// The normal of the vertex, as a unit vector
+	Vector3 normal;
+};
+
 struct ModelLod
 {
 	/// The runtime-generated ID of this model
@@ -70,8 +83,8 @@ struct ModelLod
 
 	/// The number of vertices in the model
 	size_t vertexCount;
-	/// Packed vertex data, (X Y Z) (U V) (R G B A) (NX NY NZ)
-	float *vertexData;
+	/// The vertex data for the model
+	ModelVertex *vertexData;
 
 	/// The total number of indices across all materials
 	uint32_t totalIndexCount;
@@ -79,24 +92,6 @@ struct ModelLod
 	uint32_t *indexCount;
 	/// Index data for each material
 	uint32_t **indexData;
-};
-
-struct ModelConvexHull
-{
-	/// The points of the hull
-	Vector3 *points;
-	/// The offset of the hull
-	Vector3 offset;
-	/// The number of points in the hull
-	size_t numPoints;
-};
-
-struct ModelStaticCollider
-{
-	/// The number of triangles in this mesh
-	size_t numTriangles;
-	/// The triangles in this mesh
-	JPH_Triangle *tris;
 };
 
 struct ModelDefinition
@@ -134,6 +129,24 @@ struct ModelDefinition
 	CollisionModelType collisionModelType;
 	/// The jolt collision shape for this model, or @c NULL if there isn't one
 	JPH_Shape *collisionModelShape;
+};
+
+struct ModelConvexHull
+{
+	/// The points of the hull
+	Vector3 *points;
+	/// The offset of the hull
+	Vector3 offset;
+	/// The number of points in the hull
+	size_t numPoints;
+};
+
+struct ModelStaticCollider
+{
+	/// The number of triangles in this mesh
+	size_t numTriangles;
+	/// The triangles in this mesh
+	JPH_Triangle *tris;
 };
 
 /**
