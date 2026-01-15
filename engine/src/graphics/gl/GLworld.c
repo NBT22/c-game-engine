@@ -32,15 +32,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-void GL_DrawActorWall(const Actor *actor, const mat4 actorXfm)
+void GL_DrawShadedActorWall(const Actor *actor, const mat4 actorXfm)
 {
 	const ActorWall *wall = actor->actorWall;
 
-	glUseProgram(wallShader->program);
+	glUseProgram(shadedWallShader->program);
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, wallSharedUniformsLoc, sharedUniformBuffer);
+	glBindBufferBase(GL_UNIFORM_BUFFER, shadedWallSharedUniformsLoc, sharedUniformBuffer);
 
-	glUniformMatrix4fv(wallTransformMatrixLoc, 1, GL_FALSE, *actorXfm);
+	glUniformMatrix4fv(shadedWallTransformMatrixLoc, 1, GL_FALSE, *actorXfm);
 
 	GL_LoadTextureFromAsset(wall->tex);
 
@@ -49,7 +49,8 @@ void GL_DrawActorWall(const Actor *actor, const mat4 actorXfm)
 	const Vector2 endVertex = v2(wall->b.x, wall->b.y);
 	const Vector2 startUV = v2(wall->uvOffset, 0);
 	const Vector2 endUV = v2(wall->uvScale * wall->length + wall->uvOffset, 1);
-	const float vertices[4][6] = {
+	const float backfaceWallAngle = wall->angle + PIf;
+	const float vertices[8][6] = {
 		// X Y Z U V A
 		{
 			startVertex.x,
@@ -83,9 +84,43 @@ void GL_DrawActorWall(const Actor *actor, const mat4 actorXfm)
 			endUV.y,
 			wall->angle,
 		},
+
+		// backface
+		{
+			startVertex.x,
+			halfHeight,
+			startVertex.y,
+			endUV.x,
+			startUV.y,
+			backfaceWallAngle,
+		},
+		{
+			endVertex.x,
+			halfHeight,
+			endVertex.y,
+			startUV.x,
+			startUV.y,
+			backfaceWallAngle,
+		},
+		{
+			endVertex.x,
+			-halfHeight,
+			endVertex.y,
+			startUV.x,
+			endUV.y,
+			backfaceWallAngle,
+		},
+		{
+			startVertex.x,
+			-halfHeight,
+			startVertex.y,
+			endUV.x,
+			endUV.y,
+			backfaceWallAngle,
+		},
 	};
 
-	const uint32_t indices[] = {0, 1, 2, 0, 2, 3};
+	const uint32_t indices[] = {2, 1, 0, 3, 2, 0, 4, 5, 6, 4, 6, 7};
 
 	glBindVertexArray(glBuffer->vertexArrayObject);
 
@@ -95,24 +130,127 @@ void GL_DrawActorWall(const Actor *actor, const mat4 actorXfm)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->elementBufferObject);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STREAM_DRAW);
 
-	const GLint posAttrLoc = glGetAttribLocation(wallShader->program, "VERTEX");
+	const GLint posAttrLoc = glGetAttribLocation(shadedWallShader->program, "VERTEX");
 	glVertexAttribPointer(posAttrLoc, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void *)0);
 	glEnableVertexAttribArray(posAttrLoc);
 
-	const GLint texAttrLoc = glGetAttribLocation(wallShader->program, "VERTEX_UV");
+	const GLint texAttrLoc = glGetAttribLocation(shadedWallShader->program, "VERTEX_UV");
 	glVertexAttribPointer(texAttrLoc, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void *)(3 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(texAttrLoc);
 
-	const GLint angleAttrLoc = glGetAttribLocation(wallShader->program, "VERTEX_ANGLE");
+	const GLint angleAttrLoc = glGetAttribLocation(shadedWallShader->program, "VERTEX_ANGLE");
 	glVertexAttribPointer(angleAttrLoc, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void *)(5 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(angleAttrLoc);
 
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
+	glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, NULL);
+}
+
+void GL_DrawUnshadedActorWall(const Actor *actor, const mat4 actorXfm)
+{
+	const ActorWall *wall = actor->actorWall;
+
+	glUseProgram(unshadedWallShader->program);
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, unshadedWallSharedUniformsLoc, sharedUniformBuffer);
+
+	glUniformMatrix4fv(unshadedWallTransformMatrixLoc, 1, GL_FALSE, *actorXfm);
+
+	GL_LoadTextureFromAsset(wall->tex);
+
+	const float halfHeight = wall->height / 2.0f;
+	const Vector2 startVertex = v2(wall->a.x, wall->a.y);
+	const Vector2 endVertex = v2(wall->b.x, wall->b.y);
+	const Vector2 startUV = v2(wall->uvOffset, 0);
+	const Vector2 endUV = v2(wall->uvScale * wall->length + wall->uvOffset, 1);
+	const float vertices[8][5] = {
+		// X Y Z U V A
+		{
+			startVertex.x,
+			halfHeight,
+			startVertex.y,
+			startUV.x,
+			startUV.y,
+		},
+		{
+			endVertex.x,
+			halfHeight,
+			endVertex.y,
+			endUV.x,
+			startUV.y,
+		},
+		{
+			endVertex.x,
+			-halfHeight,
+			endVertex.y,
+			endUV.x,
+			endUV.y,
+		},
+		{
+			startVertex.x,
+			-halfHeight,
+			startVertex.y,
+			startUV.x,
+			endUV.y,
+		},
+
+		// backface
+		{
+			startVertex.x,
+			halfHeight,
+			startVertex.y,
+			endUV.x,
+			startUV.y,
+		},
+		{
+			endVertex.x,
+			halfHeight,
+			endVertex.y,
+			startUV.x,
+			startUV.y,
+		},
+		{
+			endVertex.x,
+			-halfHeight,
+			endVertex.y,
+			startUV.x,
+			endUV.y,
+		},
+		{
+			startVertex.x,
+			-halfHeight,
+			startVertex.y,
+			endUV.x,
+			endUV.y,
+		},
+	};
+
+	const uint32_t indices[] = {2, 1, 0, 3, 2, 0, 4, 5, 6, 4, 6, 7};
+
+	glBindVertexArray(glBuffer->vertexArrayObject);
+
+	glBindBuffer(GL_ARRAY_BUFFER, glBuffer->vertexBufferObject);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->elementBufferObject);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STREAM_DRAW);
+
+	const GLint posAttrLoc = glGetAttribLocation(unshadedWallShader->program, "VERTEX");
+	glVertexAttribPointer(posAttrLoc, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void *)0);
+	glEnableVertexAttribArray(posAttrLoc);
+
+	const GLint texAttrLoc = glGetAttribLocation(unshadedWallShader->program, "VERTEX_UV");
+	glVertexAttribPointer(texAttrLoc, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void *)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(texAttrLoc);
+
+	glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, NULL);
 }
 
 void GL_RenderMap(const Map *map, const Camera *camera)
 {
 	GL_Enable3D(); // depth should be clear from frame start
+
+	// glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+	// glLineWidth(2);
 
 	mat4 worldViewMatrix;
 	GL_GetMatrix(camera, &worldViewMatrix);
@@ -124,10 +262,6 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 	GL_RenderModel(LoadModel(MODEL("sky")), skyModelWorldMatrix, 0, 0, COLOR_WHITE);
 	GL_ClearDepthOnly(); // prevent sky from clipping into walls
 
-	// glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-	// glLineWidth(2);
-
-	glEnable(GL_CULL_FACE);
 	for (size_t i = 0; i < GL_MAX_MAP_MODELS; i++)
 	{
 		if (mapModels[i] == NULL)
@@ -136,15 +270,16 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 		}
 		GL_RenderMapModel(mapModels[i]);
 	}
-	glDisable(GL_CULL_FACE);
-
-	// glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
 	ListLock(map->actors);
 	for (size_t i = 0; i < map->actors.length; i++)
 	{
 		const Actor *actor = ListGetPointer(map->actors, i);
 		if (!actor->actorWall && !actor->actorModel)
+		{
+			continue;
+		}
+		if (!actor->visible)
 		{
 			continue;
 		}
@@ -157,7 +292,13 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 			{
 				continue;
 			}
-			GL_DrawActorWall(actor, actorXfm);
+			if (actor->actorWall->unshaded)
+			{
+				GL_DrawUnshadedActorWall(actor, actorXfm);
+			} else
+			{
+				GL_DrawShadedActorWall(actor, actorXfm);
+			}
 		} else
 		{
 			GL_RenderModel(actor->actorModel, actorXfm, actor->currentSkinIndex, actor->currentLod, actor->modColor);
@@ -196,6 +337,9 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 
 		GL_RenderModel(GetState()->viewmodel.model, GLM_MAT4_IDENTITY, 0, 0, COLOR_WHITE);
 	}
+
+	// glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+
 	GL_Disable3D();
 }
 
@@ -289,12 +433,10 @@ void GL_RenderModel(const ModelDefinition *model,
 					const uint32_t lod,
 					const Color modColor)
 {
-	glEnable(GL_CULL_FACE);
 	for (uint32_t material = 0; material < model->materialsPerSkin; material++)
 	{
 		GL_RenderModelPart(model, modelWorldMatrix, lod, material, skin, modColor);
 	}
-	glDisable(GL_CULL_FACE);
 }
 
 void GL_RenderMapModel(const GL_MapModelBuffer *model)
@@ -403,7 +545,7 @@ void GL_SetMapParams(mat4 *modelViewProjection, const Map *map)
 	uniforms.lightColor[1] = map->lightColor.g;
 	uniforms.lightColor[2] = map->lightColor.b;
 
-	uniforms.lightDirection[0] = cosf(map->lightPitch) * sinf(map->lightYaw);
+	uniforms.lightDirection[0] = -cosf(map->lightPitch) * sinf(map->lightYaw);
 	uniforms.lightDirection[1] = sinf(map->lightPitch);
 	uniforms.lightDirection[2] = -cosf(map->lightPitch) * cosf(map->lightYaw);
 
@@ -414,14 +556,12 @@ void GL_SetMapParams(mat4 *modelViewProjection, const Map *map)
 
 inline void GL_Enable3D(void)
 {
-	glDisable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_MULTISAMPLE);
 }
 
 inline void GL_Disable3D()
 {
-	glEnable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_MULTISAMPLE);
 }
