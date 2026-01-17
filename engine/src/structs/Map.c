@@ -12,7 +12,6 @@
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/List.h>
 #include <engine/structs/Map.h>
-#include <engine/structs/Param.h>
 #include <engine/structs/Player.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
@@ -32,10 +31,11 @@ Map *CreateMap(void)
 	ListInit(map->actors, LIST_POINTER);
 	PhysicsInitMap(map);
 	CreatePlayer(&map->player, map->physicsSystem);
-	map->fogColor = 0xff000000;
+	map->fogColor = COLOR(0xff000000);
 	map->fogStart = 2000;
 	map->fogEnd = 2500;
 	map->lightColor = COLOR_WHITE;
+	map->physicsTick = 0;
 	ListInit(map->namedActorNames, LIST_POINTER);
 	ListInit(map->namedActorPointers, LIST_POINTER);
 	ListInit(map->joltBodies, LIST_UINT32);

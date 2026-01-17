@@ -39,8 +39,6 @@ if (JOLT_BUILD_TYPE_RELWITHDEBINFO AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 message(STATUS "Fetching JoltC/Jolt...")
 fetch_package(https://github.com/NBT22/joltc main joltc)
-set_target_properties(Jolt PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_target_properties(joltc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 #endregion
 
@@ -64,6 +62,8 @@ target_sources(engine INTERFACE
         include/engine/actor/Trigger.h
         src/actor/GlobalLight.c
         include/engine/actor/GlobalLight.h
+        src/actor/GlobalFog.c
+        include/engine/actor/GlobalFog.h
 
         src/assets/AssetReader.c
         include/engine/assets/AssetReader.h
@@ -156,8 +156,6 @@ target_sources(engine INTERFACE
         include/engine/structs/List.h
         src/structs/Options.c
         include/engine/structs/Options.h
-        src/structs/Param.c
-        include/engine/structs/Param.h
         src/structs/Player.c
         include/engine/structs/Player.h
         include/engine/structs/Vector2.h

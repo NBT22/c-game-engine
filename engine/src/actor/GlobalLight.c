@@ -3,25 +3,36 @@
 //
 
 #include <engine/actor/GlobalLight.h>
+#include <engine/helpers/MathEx.h>
+#include <engine/physics/Physics.h>
 #include <engine/structs/Actor.h>
 #include <engine/structs/ActorDefinition.h>
 #include <engine/structs/Color.h>
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/KVList.h>
-#include <engine/structs/Param.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Transform.h>
 #include <joltc/Math/Vector3.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
+
+static Actor *interpolatingActor = NULL;
+
+static Color interpolationPreviousColor = COLOR_BLACK;
+static float interpolationPreviousPitch = 0.0f;
+static float interpolationPreviousYaw = 0.0f;
+static uint64_t interpolationStartTick = 0;
 
 typedef struct GlobalLightData
 {
 	float pitch;
 	float yaw;
 	Color color;
+	int interpolationTicks;
 	bool startOn;
 } GlobalLightData;
 
@@ -35,6 +46,7 @@ void GlobalLightInit(Actor *this, const KvList params, Transform *transform)
 	data->pitch = euler.x;
 	data->yaw = euler.y;
 	data->color = KvGetColor(params, "light_color", COLOR_WHITE);
+	data->interpolationTicks = KvGetInt(params, "interpolation_ticks", PHYSICS_TARGET_TPS);
 	data->startOn = KvGetBool(params, "start_on", true);
 }
 
@@ -48,14 +60,58 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 		GetState()->map->lightColor = data->color;
 		data->startOn = false;
 	}
+
+	if (interpolatingActor == this)
+	{
+		const int ticksIntoInterpolation = (int)(GetState()->map->physicsTick - interpolationStartTick);
+		const float interpolationFactor = (1.0f / (float)data->interpolationTicks) * (float)ticksIntoInterpolation;
+		GetState()->map->lightPitch = lerp(interpolationPreviousPitch, data->pitch, interpolationFactor);
+		GetState()->map->lightYaw = lerp(interpolationPreviousYaw, data->yaw, interpolationFactor);
+		GetState()->map->lightColor.r = lerp(interpolationPreviousColor.r, data->color.r, interpolationFactor);
+		GetState()->map->lightColor.g = lerp(interpolationPreviousColor.g, data->color.g, interpolationFactor);
+		GetState()->map->lightColor.b = lerp(interpolationPreviousColor.b, data->color.b, interpolationFactor);
+		GetState()->map->lightColor.a = lerp(interpolationPreviousColor.a, data->color.a, interpolationFactor);
+		if (ticksIntoInterpolation == data->interpolationTicks)
+		{
+			interpolatingActor = NULL;
+		}
+	}
 }
 
 static void GlobalLightSetHandler(Actor *this, const Actor * /*sender*/, const Param * /*param*/)
 {
 	const GlobalLightData *data = this->extraData;
+	if (data->interpolationTicks == 0)
+	{
+		interpolatingActor = NULL; // stop any existing interpolation, but don't start a new one
+		GetState()->map->lightPitch = data->pitch;
+		GetState()->map->lightYaw = data->yaw;
+		GetState()->map->lightColor = data->color;
+	} else
+	{
+		interpolatingActor = this;
+		interpolationStartTick = GetState()->map->physicsTick;
+		interpolationPreviousColor = GetState()->map->lightColor;
+		interpolationPreviousPitch = GetState()->map->lightPitch;
+		interpolationPreviousYaw = GetState()->map->lightYaw;
+	}
+}
+
+static void GlobalLightSetInstantHandler(Actor *this, const Actor * /*sender*/, const Param * /*param*/)
+{
+	const GlobalLightData *data = this->extraData;
+	interpolatingActor = NULL; // stop any existing interpolation, but don't start a new one
 	GetState()->map->lightPitch = data->pitch;
 	GetState()->map->lightYaw = data->yaw;
 	GetState()->map->lightColor = data->color;
+}
+
+void GlobalLightDestroy(Actor *this)
+{
+	if (interpolatingActor == this)
+	{
+		interpolatingActor = NULL; // got vaporized :(
+	}
 }
 
 static ActorDefinition definition = {
@@ -65,7 +121,7 @@ static ActorDefinition definition = {
 	.OnPlayerContactPersisted = DefaultActorOnPlayerContactPersisted,
 	.OnPlayerContactRemoved = DefaultActorOnPlayerContactRemoved,
 	.RenderUi = DefaultActorRenderUi,
-	.Destroy = DefaultActorDestroy,
+	.Destroy = GlobalLightDestroy,
 	.Init = GlobalLightInit,
 };
 
@@ -73,5 +129,6 @@ void RegisterGlobalLight()
 {
 	RegisterDefaultActorInputs(&definition);
 	RegisterActorInput(&definition, GLOBAL_LIGHT_INPUT_SET, GlobalLightSetHandler);
+	RegisterActorInput(&definition, GLOBAL_LIGHT_INPUT_SET_INSTANT, GlobalLightSetInstantHandler);
 	RegisterActor(GLOBAL_LIGHT_ACTOR_NAME, &definition);
 }

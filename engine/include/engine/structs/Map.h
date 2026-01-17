@@ -69,7 +69,7 @@ struct Map
 	char *skyTexture;
 
 	/// The color of the fog
-	uint32_t fogColor;
+	Color fogColor;
 	/// The distance from the player at which the fog begins to fade in
 	float fogStart;
 	/// The distance from the player at which the fog is fully opaque
@@ -83,6 +83,7 @@ struct Map
 	Color lightColor;
 
 	JPH_PhysicsSystem *physicsSystem;
+	uint64_t physicsTick;
 
 	/// The player object
 	Player player;

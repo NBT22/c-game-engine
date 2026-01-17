@@ -324,8 +324,9 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 		GL_GetViewmodelMatrix(&viewModelMatrix);
 
 		GL_SharedUniforms uniforms = {
-			.fogStart = 1000,
-			.fogEnd = 1001,
+			.fogColor = map->fogColor,
+			.fogStart = map->fogStart,
+			.fogEnd = map->fogEnd,
 			.lightColor = {map->lightColor.r, map->lightColor.g, map->lightColor.b},
 			.lightDirection = {0, -(float)PI, 0},
 		};
@@ -538,7 +539,7 @@ void GL_SetMapParams(mat4 *modelViewProjection, const Map *map)
 {
 	GL_SharedUniforms uniforms;
 	glm_mat4_copy(*modelViewProjection, uniforms.worldViewMatrix);
-	uniforms.fogColor = COLOR(map->fogColor);
+	uniforms.fogColor = map->fogColor;
 	uniforms.fogStart = (float)map->fogStart;
 	uniforms.fogEnd = (float)map->fogEnd;
 	uniforms.lightColor[0] = map->lightColor.r;
