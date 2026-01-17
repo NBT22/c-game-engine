@@ -90,6 +90,12 @@ enum PendingTasksBitFlags
 	PENDING_TASK_UI_BUFFERS_RESIZE_BIT = 1 << 0,
 };
 
+typedef struct CameraUniform
+{
+	mat4 transform;
+	Vector3 position;
+} CameraUniform;
+
 typedef struct UiVertex
 {
 	float x;
@@ -106,19 +112,21 @@ typedef struct UiVertex
 	uint32_t textureIndex;
 } UiVertex;
 
+typedef struct SkyVertex
+{
+	/// The position of the vertex, in model space
+	Vector3 position;
+	/// The texture coordinate of the vertex
+	Vector2 uv;
+} SkyVertex;
+
 typedef struct DebugDrawVertex
 {
 	Vector3 position;
 	Color color;
 } DebugDrawVertex;
 
-typedef struct UniformBuffers
-{
-	LunaBuffer transformMatrix;
-	LunaBuffer lighting;
-	LunaBuffer fog;
-} UniformBuffers;
-
+// TODO: Should this be changed or is it ok
 typedef struct UiBuffer
 {
 	LunaBuffer vertexBuffer;
@@ -129,8 +137,15 @@ typedef struct UiBuffer
 	uint32_t *indexData;
 } UiBuffer;
 
-/// Contains all the information needed to keep track of the required buffers for the map models
-typedef struct MapBuffer
+typedef struct UniformBuffers
+{
+	LunaBuffer camera;
+	LunaBuffer lighting;
+	LunaBuffer fog;
+} UniformBuffers;
+
+/// Contains the required buffers for a model that can have multiple materials
+typedef struct ModelBuffer // TODO: Reorder for memory locality
 {
 	/// A buffer containing per-vertex data
 	LunaBuffer vertices;
@@ -140,7 +155,13 @@ typedef struct MapBuffer
 	LunaBuffer indices;
 	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the indirect draw call
 	LunaBuffer drawInfo;
-} MapBuffer;
+} ModelBuffer;
+
+typedef struct SkyBuffer
+{
+	LunaBuffer vertices;
+	LunaBuffer indices;
+} SkyBuffer;
 
 #ifdef JPH_DEBUG_RENDERER
 // TODO: Clean up both this and the whole system
@@ -161,8 +182,12 @@ typedef struct DebugDrawBuffer
 typedef struct Buffers
 {
 	UiBuffer ui;
-	MapBuffer map;
 	UniformBuffers uniforms;
+	ModelBuffer shadedMap;
+	ModelBuffer unshadedMap;
+	SkyBuffer sky;
+	ModelBuffer shadedViewmodel;
+	ModelBuffer unshadedViewmodel;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -172,7 +197,11 @@ typedef struct Buffers
 typedef struct Pipelines
 {
 	LunaGraphicsPipeline ui;
-	LunaGraphicsPipeline map;
+	LunaGraphicsPipeline shadedMap;
+	LunaGraphicsPipeline unshadedMap;
+	LunaGraphicsPipeline sky;
+	LunaGraphicsPipeline shadedViewmodel;
+	LunaGraphicsPipeline unshadedViewmodel;
 #ifdef JPH_DEBUG_RENDERER
 	LunaGraphicsPipeline debugDrawLines;
 	LunaGraphicsPipeline debugDrawTriangles;
@@ -212,10 +241,10 @@ extern TextureSamplers textureSamplers;
 extern LockingList textures;
 extern LunaDescriptorSetLayout descriptorSetLayout;
 extern LunaDescriptorSet descriptorSet;
-
 extern Buffers buffers;
 extern Pipelines pipelines;
 extern uint32_t pendingTasks; // Bits set with PendingTasksBitFlags
+extern uint32_t skyTextureIndex;
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderModule *shaderModule);
@@ -224,7 +253,7 @@ uint32_t TextureIndex(const char *texture);
 
 uint32_t ImageIndex(const Image *image);
 
-VkResult UpdateTransformMatrix(const Camera *camera);
+VkResult UpdateCameraUniform(const Camera *camera);
 
 void UpdateViewModelMatrix(const Viewmodel *viewmodel);
 

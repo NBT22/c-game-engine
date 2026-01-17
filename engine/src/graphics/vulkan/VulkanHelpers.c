@@ -60,6 +60,7 @@ Pipelines pipelines = {
 #endif
 };
 uint32_t pendingTasks = 0;
+uint32_t skyTextureIndex = 0;
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, const ShaderType shaderType, LunaShaderModule *shaderModule)
@@ -108,7 +109,7 @@ inline uint32_t ImageIndex(const Image *image)
 }
 
 // TODO: Make sure this doesn't need changes
-VkResult UpdateTransformMatrix(const Camera *camera)
+VkResult UpdateCameraUniform(const Camera *camera)
 {
 	mat4 perspectiveMatrix;
 	glm_perspective_lh_zo(glm_rad(camera->fov),
@@ -127,15 +128,16 @@ VkResult UpdateTransformMatrix(const Camera *camera)
 	mat4 viewMatrix;
 	glm_quat_look(cameraPosition, rotationQuat, viewMatrix);
 
-	mat4 transformMatrix;
-	glm_mat4_mul(perspectiveMatrix, viewMatrix, transformMatrix);
+	CameraUniform uniform;
+	glm_mat4_mul(perspectiveMatrix, viewMatrix, uniform.transform);
+	uniform.position = camera->transform.position;
 	const LunaBufferWriteInfo bufferWriteInfo = {
-		.bytes = sizeof(mat4),
-		.data = transformMatrix,
+		.bytes = sizeof(CameraUniform),
+		.data = &uniform,
 		.stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
 	};
-	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.uniforms.transformMatrix, &bufferWriteInfo),
-						   "Failed to write transform matrix!");
+	VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.uniforms.camera, &bufferWriteInfo),
+						   "Failed to write camera uniform!");
 
 	return VK_SUCCESS;
 }

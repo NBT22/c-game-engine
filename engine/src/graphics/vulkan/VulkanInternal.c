@@ -260,7 +260,7 @@ bool CreateDescriptorSetLayouts()
 			.bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
 		},
 		{
-			.bindingName = "Transform Matrix",
+			.bindingName = "Camera",
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.descriptorCount = 1,
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
@@ -269,7 +269,7 @@ bool CreateDescriptorSetLayouts()
 			.bindingName = "Global Lighting",
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
 		{
 			.bindingName = "Fog",
@@ -430,8 +430,12 @@ bool CreateTextureSamplers()
 bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
-	VulkanTest(CreateMapBuffers(), "Failed to create map buffers!");
 	VulkanTest(CreateUniformBuffers(), "Failed to create uniform buffers!");
+	VulkanTest(CreateShadedMapBuffers(), "Failed to create shaded map buffers!");
+	VulkanTest(CreateUnshadedMapBuffers(), "Failed to create unshaded map buffers!");
+	VulkanTest(CreateSkyBuffers(), "Failed to create sky buffers!");
+	VulkanTest(CreateShadedViewmodelBuffers(), "Failed to create shaded viewmodel buffers!");
+	VulkanTest(CreateUnshadedViewmodelBuffers(), "Failed to create unshaded viewmodel buffers!");
 	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;
@@ -468,11 +472,11 @@ bool CreateDescriptorSet()
 	VulkanTest(lunaAllocateDescriptorSets(&allocationInfo, &descriptorSet), "Failed to allocate descriptor sets!");
 
 	const LunaDescriptorBufferInfo transformMatrixBufferInfo = {
-		.buffer = buffers.uniforms.transformMatrix,
+		.buffer = buffers.uniforms.camera,
 	};
 	const LunaWriteDescriptorSet transformMatrixWrite = {
 		.descriptorSet = descriptorSet,
-		.bindingName = "Transform Matrix",
+		.bindingName = "Camera",
 		.descriptorCount = 1,
 		.bufferInfo = &transformMatrixBufferInfo,
 	};

@@ -11,9 +11,17 @@
 
 VkResult CreateUiBuffers();
 
-VkResult CreateMapBuffers();
-
 VkResult CreateUniformBuffers();
+
+VkResult CreateShadedMapBuffers();
+
+VkResult CreateUnshadedMapBuffers();
+
+VkResult CreateSkyBuffers();
+
+VkResult CreateShadedViewmodelBuffers();
+
+VkResult CreateUnshadedViewmodelBuffers();
 
 VkResult CreateDebugDrawBuffers();
 

@@ -116,7 +116,7 @@ struct ModelDefinition
 	/// The skins for this model, each an array of materialsPerSkin indices into the materials array
 	uint32_t **skins;
 	/// The LODs for this model
-	ModelLod **lods;
+	ModelLod **lods; // TODO: Make this into a single pointer
 
 	/// The origin (center) of the bounding box
 	Vector3 boundingBoxOrigin;
