@@ -139,18 +139,6 @@ Map *LoadMap(const char *path)
 		}
 	}
 
-	for (int i = 0; i < 3000; i++)
-	{
-		Transform xfm = {
-			.rotation = JPH_Quat_Identity,
-		};
-		xfm.position.x = 50 * ((float)rand() / RAND_MAX);
-		xfm.position.y = 50 * ((float)rand() / RAND_MAX);
-		xfm.position.z = 50 * ((float)rand() / RAND_MAX);
-		Actor *actor = CreateActor(&xfm, TEST_ACTOR_NAME, NULL, bodyInterface);
-		ListAdd(map->actors, actor);
-	}
-
 	EXPECT_BYTES(sizeof(size_t), bytesRemaining);
 	map->modelCount = ReadSizeT(mapData->data, &offset);
 	map->models = malloc(sizeof(MapModel) * map->modelCount);
