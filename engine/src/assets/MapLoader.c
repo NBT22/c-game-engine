@@ -34,6 +34,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "actor/TestActor.h"
+
 Map *LoadMap(const char *path)
 {
 	Map *map = CreateMap();
@@ -135,6 +137,18 @@ Map *LoadMap(const char *path)
 			ListAdd(map->namedActorNames, actorName);
 			ListAdd(map->namedActorPointers, actor);
 		}
+	}
+
+	for (int i = 0; i < 3000; i++)
+	{
+		Transform xfm = {
+			.rotation = JPH_Quat_Identity,
+		};
+		xfm.position.x = 50 * ((float)rand() / RAND_MAX);
+		xfm.position.y = 50 * ((float)rand() / RAND_MAX);
+		xfm.position.z = 50 * ((float)rand() / RAND_MAX);
+		Actor *actor = CreateActor(&xfm, TEST_ACTOR_NAME, NULL, bodyInterface);
+		ListAdd(map->actors, actor);
 	}
 
 	EXPECT_BYTES(sizeof(size_t), bytesRemaining);

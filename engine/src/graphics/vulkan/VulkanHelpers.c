@@ -158,7 +158,6 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 						 -viewmodel->transform.position.y,
 						 viewmodel->transform.position.z});
 
-	// TODO rotation other than yaw
 	mat4 rotationMatrix = GLM_MAT4_IDENTITY_INIT;
 	glm_rotate(rotationMatrix,
 			   JPH_Quat_GetRotationAngle(&viewmodel->transform.rotation, &Vector3_AxisY),
@@ -227,50 +226,12 @@ void DrawQuadInternal(const mat4 vertices_posXY_uvZW, const Color *color, const 
 	UiVertex *vertices = buffers.ui.vertexData + vertexOffset;
 	uint32_t *indices = buffers.ui.indexData + (buffers.ui.allocatedQuads - buffers.ui.freeQuads) * 6;
 
-	vertices[0] = (UiVertex){
-		.x = vertices_posXY_uvZW[0][0],
-		.y = vertices_posXY_uvZW[0][1],
-		.u = vertices_posXY_uvZW[0][2],
-		.v = vertices_posXY_uvZW[0][3],
-		.r = color->r,
-		.g = color->g,
-		.b = color->b,
-		.a = color->a,
-		.textureIndex = textureIndex,
-	};
-	vertices[1] = (UiVertex){
-		.x = vertices_posXY_uvZW[1][0],
-		.y = vertices_posXY_uvZW[1][1],
-		.u = vertices_posXY_uvZW[1][2],
-		.v = vertices_posXY_uvZW[1][3],
-		.r = color->r,
-		.g = color->g,
-		.b = color->b,
-		.a = color->a,
-		.textureIndex = textureIndex,
-	};
-	vertices[2] = (UiVertex){
-		.x = vertices_posXY_uvZW[2][0],
-		.y = vertices_posXY_uvZW[2][1],
-		.u = vertices_posXY_uvZW[2][2],
-		.v = vertices_posXY_uvZW[2][3],
-		.r = color->r,
-		.g = color->g,
-		.b = color->b,
-		.a = color->a,
-		.textureIndex = textureIndex,
-	};
-	vertices[3] = (UiVertex){
-		.x = vertices_posXY_uvZW[3][0],
-		.y = vertices_posXY_uvZW[3][1],
-		.u = vertices_posXY_uvZW[3][2],
-		.v = vertices_posXY_uvZW[3][3],
-		.r = color->r,
-		.g = color->g,
-		.b = color->b,
-		.a = color->a,
-		.textureIndex = textureIndex,
-	};
+	for (uint8_t i = 0; i < 4; i++)
+	{
+		memcpy(vertices, vertices_posXY_uvZW[i], 16);
+		memcpy((char *)(vertices) + 16, &color->r, 16);
+		((uint32_t *)(vertices++))[8] = textureIndex;
+	}
 
 	indices[0] = vertexOffset;
 	indices[1] = vertexOffset + 1;

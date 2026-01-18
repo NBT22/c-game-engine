@@ -25,7 +25,8 @@ set(X86_64_VERSION "3" CACHE STRING "The x86_64 microarchitecture level to targe
 set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-missing-field-initializers -Wno-c23-extensions -fvisibility=hidden -Wundef -fPIC ${CMAKE_C_FLAGS}")
 
 set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-set(CMAKE_C_FLAGS_RELEASE "-g0 -O3 -s -DNDEBUG -Wl,--gc-sections -fdata-sections -ffunction-sections")
+#set(CMAKE_C_FLAGS_RELEASE "-g0 -O3 -s -DNDEBUG -Wl,--gc-sections -fdata-sections -ffunction-sections")
+set(CMAKE_C_FLAGS_RELEASE "-g -O3 -Wl,--gc-sections -fdata-sections -ffunction-sections")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -O3 -Wl,--gc-sections -fdata-sections -ffunction-sections")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")

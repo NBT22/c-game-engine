@@ -240,14 +240,14 @@ void GL_LoadModel(const ModelDefinition *model, const uint32_t lod, const size_t
 
 			glBindBuffer(GL_ARRAY_BUFFER, modelBuffer->vertexBufferObject);
 			glBufferData(GL_ARRAY_BUFFER,
-						 (long)(model->lods[l]->vertexCount * sizeof(ModelVertex)),
-						 model->lods[l]->vertexData,
+						 (long)(model->lods[l].vertexCount * sizeof(ModelVertex)),
+						 model->lods[l].vertexData,
 						 GL_STATIC_DRAW);
 
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modelBuffer->elementBufferObject);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-						 (long)(model->lods[l]->indexCount[m] * sizeof(uint32_t)),
-						 model->lods[l]->indexData[m],
+						 (long)(model->lods[l].indexCount[m] * sizeof(uint32_t)),
+						 model->lods[l].indexData[m],
 						 GL_STATIC_DRAW);
 		}
 	}

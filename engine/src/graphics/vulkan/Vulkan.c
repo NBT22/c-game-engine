@@ -4,13 +4,16 @@
 
 #include <assert.h>
 #include <cglm/types.h>
+#include <engine/assets/AssetReader.h>
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/Drawing.h>
 #include <engine/graphics/vulkan/Vulkan.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
 #include <engine/graphics/vulkan/VulkanInternal.h>
+#include <engine/graphics/vulkan/VulkanResources.h>
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
+#include <engine/structs/GlobalState.h>
 #include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Viewmodel.h>
@@ -31,9 +34,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan_core.h>
-
-#include "engine/assets/AssetReader.h"
-#include "engine/graphics/vulkan/VulkanResources.h"
 #ifdef JPH_DEBUG_RENDERER
 #include <engine/debug/JoltDebugRenderer.h>
 #include <engine/subsystem/Error.h>
@@ -64,7 +64,7 @@ static inline VkResult LoadSky(const ModelDefinition *model)
 		LogWarning("Discarding %d extra lods from sky model!\n", model->lodCount - 1);
 	}
 
-	ModelLod *lod = model->lods[0];
+	const ModelLod *lod = model->lods;
 
 	SkyVertex vertices[lod->vertexCount];
 	for (size_t i = 0; i < lod->vertexCount; i++)
@@ -267,6 +267,7 @@ bool VK_Init(SDL_Window *window)
 				VK_API_VERSION_PATCH(physicalDeviceProperties.apiVersion));
 
 		VulkanTest(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky model!");
+		// VulkanTest(LoadViewmodel(GetState()->viewmodel), "Failed to load sky model!");
 
 		return true;
 	}
@@ -661,36 +662,10 @@ void VK_DrawTexturedQuadRegionMod(const int32_t x,
 
 void VK_DrawTexturedQuadsBatched(const float *vertices, const int32_t quadCount, const char *texture, const Color color)
 {
+	const uint32_t textureIndex = TextureIndex(texture);
 	for (int32_t i = 0; i < quadCount; i++)
 	{
-		const uint32_t index = i * 16;
-		const mat4 matrix = {
-			{
-				vertices[index + 0],
-				vertices[index + 1],
-				vertices[index + 2],
-				vertices[index + 3],
-			},
-			{
-				vertices[index + 4],
-				vertices[index + 5],
-				vertices[index + 6],
-				vertices[index + 7],
-			},
-			{
-				vertices[index + 8],
-				vertices[index + 9],
-				vertices[index + 10],
-				vertices[index + 11],
-			},
-			{
-				vertices[index + 12],
-				vertices[index + 13],
-				vertices[index + 14],
-				vertices[index + 15],
-			},
-		};
-		DrawQuadInternal(matrix, &color, TextureIndex(texture));
+		DrawQuadInternal((vec4 *)(vertices + i * 16), &color, textureIndex);
 	}
 }
 

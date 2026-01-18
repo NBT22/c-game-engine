@@ -113,10 +113,11 @@ struct ModelDefinition
 	uint32_t lodCount;
 
 	Material *materials;
-	/// The skins for this model, each an array of materialsPerSkin indices into the materials array
-	uint32_t **skins;
+	/// An array of length @c skinCount, with each element containing an array of length @c materialsPerSkin,
+	/// where each element is an index into the @c materials array
+	uint32_t **skinMaterialIndices;
 	/// The LODs for this model
-	ModelLod **lods; // TODO: Make this into a single pointer
+	ModelLod *lods;
 
 	/// The origin (center) of the bounding box
 	Vector3 boundingBoxOrigin;

@@ -86,15 +86,15 @@ ModelDefinition *LoadModelInternal(const char *asset)
 		mat->shader = ReadUint(assetData->data, &offset);
 	}
 
-	model->skins = malloc(sizeof(uint32_t *) * model->skinCount);
-	CheckAlloc(model->skins);
+	model->skinMaterialIndices = malloc(sizeof(uint32_t *) * model->skinCount);
+	CheckAlloc(model->skinMaterialIndices);
 
 	const size_t skinSize = sizeof(uint32_t) * model->materialsPerSkin;
 	for (uint32_t i = 0; i < model->skinCount; i++)
 	{
-		model->skins[i] = malloc(skinSize);
-		CheckAlloc(model->skins[i]);
-		uint32_t *skin = model->skins[i];
+		model->skinMaterialIndices[i] = malloc(skinSize);
+		CheckAlloc(model->skinMaterialIndices[i]);
+		uint32_t *skin = model->skinMaterialIndices[i];
 		EXPECT_BYTES(sizeof(uint32_t) * model->materialsPerSkin, bytesRemaining);
 		for (uint32_t j = 0; j < model->materialsPerSkin; j++)
 		{
@@ -102,13 +102,11 @@ ModelDefinition *LoadModelInternal(const char *asset)
 		}
 	}
 
-	model->lods = malloc(sizeof(ModelLod *) * model->lodCount);
+	model->lods = malloc(sizeof(ModelLod) * model->lodCount);
 	CheckAlloc(model->lods);
 	for (uint32_t i = 0; i < model->lodCount; i++)
 	{
-		model->lods[i] = malloc(sizeof(ModelLod));
-		CheckAlloc(model->lods[i]);
-		ModelLod *lod = model->lods[i];
+		ModelLod *lod = model->lods + i;
 
 		lod->id = lodId;
 		lodId++;
@@ -274,12 +272,12 @@ void FreeModel(ModelDefinition *model)
 	}
 	for (uint32_t i = 0; i < model->skinCount; i++)
 	{
-		free(model->skins[i]);
+		free(model->skinMaterialIndices[i]);
 	}
 
 	for (uint32_t i = 0; i < model->lodCount; i++)
 	{
-		ModelLod *lod = model->lods[i];
+		const ModelLod *lod = model->lods + i;
 		free(lod->vertexData);
 		for (uint32_t j = 0; j < model->materialsPerSkin; j++)
 		{
@@ -287,7 +285,6 @@ void FreeModel(ModelDefinition *model)
 		}
 		free(lod->indexData);
 		free(lod->indexCount);
-		free(lod);
 	}
 
 	for (uint32_t i = 0; i < model->materialCount; i++)
@@ -302,7 +299,7 @@ void FreeModel(ModelDefinition *model)
 	JPH_Shape_Destroy(model->boundingBoxShape);
 
 	free(model->name);
-	free(model->skins);
+	free(model->skinMaterialIndices);
 	free(model->lods);
 	free(model->materials);
 	free(model);

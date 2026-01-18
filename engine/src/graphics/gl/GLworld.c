@@ -353,7 +353,7 @@ void GL_RenderModelPart(const ModelDefinition *model,
 						Color modColor)
 {
 	const uint32_t realSkin = min(skin, model->skinCount - 1);
-	const uint32_t *skinIndices = model->skins[realSkin];
+	const uint32_t *skinIndices = model->skinMaterialIndices[realSkin];
 	const Material mat = model->materials[skinIndices[material]];
 
 	const ModelShader shader = mat.shader;
@@ -425,7 +425,7 @@ void GL_RenderModelPart(const ModelDefinition *model,
 		glUniform4fv(modColUniformLocation, 1, COLOR_TO_ARR(modColor));
 	}
 
-	glDrawElements(GL_TRIANGLES, (int)model->lods[lod]->indexCount[material], GL_UNSIGNED_INT, NULL);
+	glDrawElements(GL_TRIANGLES, (int)model->lods[lod].indexCount[material], GL_UNSIGNED_INT, NULL);
 }
 
 void GL_RenderModel(const ModelDefinition *model,
