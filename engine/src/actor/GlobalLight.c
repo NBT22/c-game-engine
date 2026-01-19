@@ -10,6 +10,7 @@
 #include <engine/structs/Color.h>
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/KVList.h>
+#include <engine/structs/Map.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
 #include <joltc/Math/Quat.h>
@@ -58,6 +59,7 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 		GetState()->map->lightPitch = data->pitch;
 		GetState()->map->lightYaw = data->yaw;
 		GetState()->map->lightColor = data->color;
+		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 		data->startOn = false;
 	}
 
@@ -71,6 +73,7 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 		GetState()->map->lightColor.g = lerp(interpolationPreviousColor.g, data->color.g, interpolationFactor);
 		GetState()->map->lightColor.b = lerp(interpolationPreviousColor.b, data->color.b, interpolationFactor);
 		GetState()->map->lightColor.a = lerp(interpolationPreviousColor.a, data->color.a, interpolationFactor);
+		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 		if (ticksIntoInterpolation == data->interpolationTicks)
 		{
 			interpolatingActor = NULL;
@@ -87,6 +90,7 @@ static void GlobalLightSetHandler(Actor *this, const Actor * /*sender*/, const P
 		GetState()->map->lightPitch = data->pitch;
 		GetState()->map->lightYaw = data->yaw;
 		GetState()->map->lightColor = data->color;
+		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 	} else
 	{
 		interpolatingActor = this;
@@ -104,6 +108,7 @@ static void GlobalLightSetInstantHandler(Actor *this, const Actor * /*sender*/, 
 	GetState()->map->lightPitch = data->pitch;
 	GetState()->map->lightYaw = data->yaw;
 	GetState()->map->lightColor = data->color;
+	GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 }
 
 void GlobalLightDestroy(Actor *this)
