@@ -27,6 +27,8 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
+#include "../../../../cmake-build-release/_deps/cglm-src/include/cglm/clipspace/persp_lh_no.h"
+
 #pragma region variables
 bool minimized = false;
 VkExtent2D swapChainExtent = {0};
@@ -143,7 +145,7 @@ VkResult UpdateCameraUniform(const Camera *camera)
 }
 
 // TODO: Update this
-void UpdateViewModelMatrix(const Viewmodel *viewmodel)
+VkResult UpdateViewModelMatrix(const Viewmodel *viewmodel)
 {
 	mat4 perspectiveMatrix;
 	glm_perspective_lh_zo(glm_rad(VIEWMODEL_FOV),
@@ -167,16 +169,34 @@ void UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	glm_mat4_mul(translationMatrix, rotationMatrix, translationMatrix);
 	glm_mat4_mul(perspectiveMatrix, translationMatrix, viewModelMatrix);
 
-	// for (uint32_t i = 0; i < buffers.viewModel.drawCount; i++)
-	// {
-	// 	memcpy(buffers.viewModel.instanceDatas[i].transform, viewModelMatrix, sizeof(mat4));
-	// }
-	// const LunaBufferWriteInfo instanceDataBufferWriteInfo = {
-	// 	.bytes = sizeof(ModelInstanceData) * buffers.viewModel.drawCount,
-	// 	.data = buffers.viewModel.instanceDatas,
-	// 	.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-	// };
-	// lunaWriteDataToBuffer(buffers.viewModel.instanceDataBuffer, &instanceDataBufferWriteInfo);
+	const size_t shadedMaterialCount = lunaGetBufferSize(buffers.viewmodel.perShadedMaterial) /
+									   sizeof(ModelInstanceData);
+	for (size_t i = 0; i < shadedMaterialCount; i++)
+	{
+		const LunaBufferWriteInfo writeInfo = {
+			.bytes = sizeof(mat4),
+			.data = viewModelMatrix,
+			.offset = i * sizeof(mat4),
+			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		};
+		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.viewmodel.perShadedMaterial, &writeInfo),
+							   "Failed to write viewmodel transform matrix to shaded buffer!");
+	}
+	const size_t unshadedMaterialCount = lunaGetBufferSize(buffers.viewmodel.perUnshadedMaterial) /
+										 sizeof(ModelInstanceData);
+	for (size_t i = 0; i < unshadedMaterialCount; i++)
+	{
+		const LunaBufferWriteInfo writeInfo = {
+			.bytes = sizeof(mat4),
+			.data = viewModelMatrix,
+			.offset = i * sizeof(mat4),
+			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		};
+		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.viewmodel.perUnshadedMaterial, &writeInfo),
+							   "Failed to write viewmodel transform matrix to unshaded buffer!");
+	}
+
+	return VK_SUCCESS;
 }
 
 void EnsureSpaceForUiElements(const size_t quadCount)

@@ -220,16 +220,16 @@ void GL_LoadModel(const ModelDefinition *model, const uint32_t lod, const size_t
 	GL_ModelBuffers *buf = malloc(sizeof(GL_ModelBuffers));
 	CheckAlloc(buf);
 	buf->lodCount = model->lodCount;
-	buf->materialCount = model->materialsPerSkin;
+	buf->materialSlotCount = model->materialSlotCount;
 	buf->buffers = malloc(sizeof(GL_Buffer *) * model->lodCount);
 	CheckAlloc(buf->buffers);
 
 	for (uint32_t l = 0; l < buf->lodCount; l++)
 	{
-		buf->buffers[l] = malloc(sizeof(GL_Buffer) * model->materialsPerSkin);
+		buf->buffers[l] = malloc(sizeof(GL_Buffer) * model->materialSlotCount);
 		CheckAlloc(buf->buffers[l]);
 
-		for (uint32_t m = 0; m < buf->materialCount; m++)
+		for (uint32_t m = 0; m < buf->materialSlotCount; m++)
 		{
 			GL_Buffer *modelBuffer = &buf->buffers[l][m];
 			glGenVertexArrays(1, &modelBuffer->vertexArrayObject);

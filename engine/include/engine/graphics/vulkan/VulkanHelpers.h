@@ -126,6 +126,19 @@ typedef struct DebugDrawVertex
 	Color color;
 } DebugDrawVertex;
 
+typedef struct ModelInstanceData
+{
+	mat4 transformMatrix;
+	uint32_t textureIndex;
+} ModelInstanceData;
+
+typedef struct ActorModelInstanceData
+{
+	mat4 transformMatrix;
+	float modColor;
+	uint32_t textureIndex;
+} ActorModelInstanceData;
+
 // TODO: Should this be changed or is it ok
 typedef struct UiBuffer
 {
@@ -149,12 +162,16 @@ typedef struct ModelBuffer // TODO: Reorder for memory locality
 {
 	/// A buffer containing per-vertex data
 	LunaBuffer vertices;
-	/// A buffer containing data that only needs to exist once per-material
-	LunaBuffer perMaterial;
 	/// A buffer containing the index data to use along-side the per-vertex data
 	LunaBuffer indices;
-	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the indirect draw call
-	LunaBuffer drawInfo;
+	/// A buffer containing data that only needs to exist once per shaded material
+	LunaBuffer perShadedMaterial;
+	/// A buffer containing data that only needs to exist once per unshaded material
+	LunaBuffer perUnshadedMaterial;
+	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the shaded materials draw call
+	LunaBuffer shadedDrawInfo;
+	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the unshaded materials draw call
+	LunaBuffer unshadedDrawInfo;
 } ModelBuffer;
 
 typedef struct SkyBuffer
@@ -183,11 +200,9 @@ typedef struct Buffers
 {
 	UiBuffer ui;
 	UniformBuffers uniforms;
-	ModelBuffer shadedMap;
-	ModelBuffer unshadedMap;
+	ModelBuffer map;
+	ModelBuffer viewmodel;
 	SkyBuffer sky;
-	ModelBuffer shadedViewmodel;
-	ModelBuffer unshadedViewmodel;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -255,7 +270,7 @@ uint32_t ImageIndex(const Image *image);
 
 VkResult UpdateCameraUniform(const Camera *camera);
 
-void UpdateViewModelMatrix(const Viewmodel *viewmodel);
+VkResult UpdateViewModelMatrix(const Viewmodel *viewmodel);
 
 void EnsureSpaceForUiElements(size_t quadCount);
 

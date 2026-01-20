@@ -434,7 +434,7 @@ void GL_RenderModel(const ModelDefinition *model,
 					const uint32_t lod,
 					const Color modColor)
 {
-	for (uint32_t material = 0; material < model->materialsPerSkin; material++)
+	for (uint32_t material = 0; material < model->materialSlotCount; material++)
 	{
 		GL_RenderModelPart(model, modelWorldMatrix, lod, material, skin, modColor);
 	}

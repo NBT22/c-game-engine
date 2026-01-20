@@ -175,7 +175,8 @@ bool CreateRenderPass()
 {
 	// TODO: Once Luna supports it, prefer using VK_FORMAT_D32_SFLOAT
 	//  Also ensure that that is the best format for all drivers, not just for NVIDIA
-	lunaSetDepthImageFormat(2, (VkFormat[]){VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT});
+	VulkanTest(lunaSetDepthImageFormat(2, (VkFormat[]){VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT}),
+			   "Failed to set depth image format!");
 
 	switch (GetState()->options.msaa)
 	{
@@ -431,11 +432,9 @@ bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
 	VulkanTest(CreateUniformBuffers(), "Failed to create uniform buffers!");
-	VulkanTest(CreateShadedMapBuffers(), "Failed to create shaded map buffers!");
-	VulkanTest(CreateUnshadedMapBuffers(), "Failed to create unshaded map buffers!");
+	VulkanTest(CreateMapBuffers(), "Failed to create map buffers!");
 	VulkanTest(CreateSkyBuffers(), "Failed to create sky buffers!");
-	VulkanTest(CreateShadedViewmodelBuffers(), "Failed to create shaded viewmodel buffers!");
-	VulkanTest(CreateUnshadedViewmodelBuffers(), "Failed to create unshaded viewmodel buffers!");
+	VulkanTest(CreateViewmodelBuffers(), "Failed to create viewmodel buffers!");
 	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;

@@ -65,7 +65,7 @@ ModelDefinition *LoadModelInternal(const char *asset)
 	size_t offset = 0;
 	EXPECT_BYTES((sizeof(uint32_t) * 4) + 1, bytesRemaining);
 	model->materialCount = ReadUint(assetData->data, &offset);
-	model->materialsPerSkin = ReadUint(assetData->data, &offset);
+	model->materialSlotCount = ReadUint(assetData->data, &offset);
 	model->skinCount = ReadUint(assetData->data, &offset);
 	model->lodCount = ReadUint(assetData->data, &offset);
 	model->collisionModelType = ReadByte(assetData->data, &offset);
@@ -89,14 +89,14 @@ ModelDefinition *LoadModelInternal(const char *asset)
 	model->skinMaterialIndices = malloc(sizeof(uint32_t *) * model->skinCount);
 	CheckAlloc(model->skinMaterialIndices);
 
-	const size_t skinSize = sizeof(uint32_t) * model->materialsPerSkin;
+	const size_t skinSize = sizeof(uint32_t) * model->materialSlotCount;
 	for (uint32_t i = 0; i < model->skinCount; i++)
 	{
 		model->skinMaterialIndices[i] = malloc(skinSize);
 		CheckAlloc(model->skinMaterialIndices[i]);
 		uint32_t *skin = model->skinMaterialIndices[i];
-		EXPECT_BYTES(sizeof(uint32_t) * model->materialsPerSkin, bytesRemaining);
-		for (uint32_t j = 0; j < model->materialsPerSkin; j++)
+		EXPECT_BYTES(sizeof(uint32_t) * model->materialSlotCount, bytesRemaining);
+		for (uint32_t j = 0; j < model->materialSlotCount; j++)
 		{
 			skin[j] = ReadUint(assetData->data, &offset);
 		}
@@ -123,15 +123,15 @@ ModelDefinition *LoadModelInternal(const char *asset)
 		ReadBytes(assetData->data, &offset, vertexDataSize, lod->vertexData);
 
 		lod->totalIndexCount = ReadUint(assetData->data, &offset);
-		const size_t indexCountSize = model->materialsPerSkin * sizeof(uint32_t);
+		const size_t indexCountSize = model->materialSlotCount * sizeof(uint32_t);
 		EXPECT_BYTES(indexCountSize, bytesRemaining);
 		lod->indexCount = malloc(indexCountSize);
 		CheckAlloc(lod->indexCount);
 		ReadBytes(assetData->data, &offset, indexCountSize, lod->indexCount);
 
-		lod->indexData = malloc(sizeof(uint32_t *) * model->materialsPerSkin);
+		lod->indexData = malloc(sizeof(uint32_t *) * model->materialSlotCount);
 		CheckAlloc(lod->indexData);
-		for (uint32_t j = 0; j < model->materialsPerSkin; j++)
+		for (uint32_t j = 0; j < model->materialSlotCount; j++)
 		{
 			EXPECT_BYTES(lod->indexCount[j] * sizeof(uint32_t), bytesRemaining);
 			uint32_t *indexData = malloc(lod->indexCount[j] * sizeof(uint32_t));
@@ -279,7 +279,7 @@ void FreeModel(ModelDefinition *model)
 	{
 		const ModelLod *lod = model->lods + i;
 		free(lod->vertexData);
-		for (uint32_t j = 0; j < model->materialsPerSkin; j++)
+		for (uint32_t j = 0; j < model->materialSlotCount; j++)
 		{
 			free(lod->indexData[j]);
 		}

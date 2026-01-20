@@ -75,22 +75,22 @@ struct ModelVertex
 
 struct ModelLod
 {
-	/// The runtime-generated ID of this model
+	/// The runtime-generated ID of this LOD
 	uint32_t id;
 
 	/// How far away the camera must be before this LOD is used (units squared)
 	float distanceSquared;
 
-	/// The number of vertices in the model
+	/// The number of vertices in the LOD
 	size_t vertexCount;
-	/// The vertex data for the model
+	/// The vertex data for the LOD
 	ModelVertex *vertexData;
 
-	/// The total number of indices across all materials
+	/// The total number of indices across all material slots
 	uint32_t totalIndexCount;
-	/// The number of indices in each material
+	/// The number of indices in each material slot, indexed with a slot number
 	uint32_t *indexCount;
-	/// Index data for each material
+	/// Index data for each material slot, indexed with a slot number
 	uint32_t **indexData;
 };
 
@@ -101,19 +101,20 @@ struct ModelDefinition
 	/// The asset name of this model
 	char *name;
 
-	/// The number of materials in the model
+	/// The total number of materials in the model, across all skins
 	uint32_t materialCount;
 
 	/// The number of materials per skin
-	uint32_t materialsPerSkin;
+	uint32_t materialSlotCount;
 
 	/// The number of skins in the model
 	uint32_t skinCount;
 	/// The number of LODs in the model
 	uint32_t lodCount;
 
+	/// An array of materials with length @c materialCount
 	Material *materials;
-	/// An array of length @c skinCount, with each element containing an array of length @c materialsPerSkin,
+	/// An array of length @c skinCount, where each element is an array of length @c materialSlotCount,
 	/// where each element is an index into the @c materials array
 	uint32_t **skinMaterialIndices;
 	/// The LODs for this model

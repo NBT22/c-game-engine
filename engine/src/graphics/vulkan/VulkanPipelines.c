@@ -275,7 +275,7 @@ bool CreateUnshadedMapPipeline()
 	const VkVertexInputBindingDescription bindingDescriptions[] = {
 		{
 			.binding = 0,
-			.stride = sizeof(MapVertex) - sizeof(Vector3), // No normals
+			.stride = sizeof(MapVertex),
 			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 		},
 		{
@@ -421,8 +421,11 @@ bool CreateSkyPipeline()
 bool CreateShadedViewmodelPipeline()
 {
 	LunaShaderModule vertShaderModule = LUNA_NULL_HANDLE;
+	LunaShaderModule fragShaderModule = LUNA_NULL_HANDLE;
 	VulkanTest(CreateShaderModule(SHADER("vulkan/viewmodel_shaded_v"), SHADER_TYPE_VERT, &vertShaderModule),
 			   "Failed to load shaded viewmodel vertex shader!");
+	VulkanTest(CreateShaderModule(SHADER("vulkan/viewmodel_shaded_f"), SHADER_TYPE_FRAG, &fragShaderModule),
+			   "Failed to load shaded viewmodel fragment shader!");
 
 	const LunaPipelineShaderStageCreationInfo shaderStages[] = {
 		{
@@ -431,7 +434,7 @@ bool CreateShadedViewmodelPipeline()
 		},
 		{
 			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.module = modelShadedFragShaderModule,
+			.module = fragShaderModule,
 		},
 	};
 
@@ -443,7 +446,7 @@ bool CreateShadedViewmodelPipeline()
 		},
 		{
 			.binding = 1,
-			.stride = sizeof(uint32_t),
+			.stride = sizeof(ModelInstanceData),
 			.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
 		},
 	};
@@ -475,8 +478,32 @@ bool CreateShadedViewmodelPipeline()
 		{
 			.location = 4,
 			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 0,
+		},
+		{
+			.location = 5,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 1,
+		},
+		{
+			.location = 6,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 2,
+		},
+		{
+			.location = 7,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 3,
+		},
+		{
+			.location = 8,
+			.binding = 1,
 			.format = VK_FORMAT_R32_UINT,
-			.offset = 0,
+			.offset = offsetof(ModelInstanceData, textureIndex),
 		},
 	};
 	const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
@@ -527,12 +554,12 @@ bool CreateUnshadedViewmodelPipeline()
 	const VkVertexInputBindingDescription bindingDescriptions[] = {
 		{
 			.binding = 0,
-			.stride = sizeof(ModelVertex) - sizeof(Vector3), // No normals
+			.stride = sizeof(ModelVertex),
 			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 		},
 		{
 			.binding = 1,
-			.stride = sizeof(uint32_t),
+			.stride = sizeof(ModelInstanceData),
 			.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
 		},
 	};
@@ -558,8 +585,32 @@ bool CreateUnshadedViewmodelPipeline()
 		{
 			.location = 3,
 			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 0,
+		},
+		{
+			.location = 4,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 1,
+		},
+		{
+			.location = 5,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 2,
+		},
+		{
+			.location = 6,
+			.binding = 1,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(ModelInstanceData, transformMatrix) + sizeof(vec4) * 3,
+		},
+		{
+			.location = 7,
+			.binding = 1,
 			.format = VK_FORMAT_R32_UINT,
-			.offset = 0,
+			.offset = offsetof(ModelInstanceData, textureIndex),
 		},
 	};
 	const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
