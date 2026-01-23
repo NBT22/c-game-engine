@@ -27,8 +27,6 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
-#include "../../../../cmake-build-release/_deps/cglm-src/include/cglm/clipspace/persp_lh_no.h"
-
 #pragma region variables
 bool minimized = false;
 VkExtent2D swapChainExtent = {0};
