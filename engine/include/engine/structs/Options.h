@@ -71,7 +71,7 @@ struct Options
 	bool limitFpsWhenUnfocused;
 	/// The LOD distance multiplier
 	float lodMultiplier;
-	// Field of view
+	/// Field of view
 	float fov;
 	/// Anisotropy level
 	OptionsAnisotropy anisotropy;

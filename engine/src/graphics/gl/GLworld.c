@@ -395,7 +395,7 @@ void GL_RenderShadedModelPart(const ModelDefinition *model,
 						  (void *)(9 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(shadedModelNormalLoc);
 
-	glDrawElements(GL_TRIANGLES, (int)model->lods[lod]->indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
+	glDrawElements(GL_TRIANGLES, (int)model->lods[lod].indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
 }
 
 void GL_RenderUnshadedModelPart(const ModelDefinition *model,
@@ -436,7 +436,7 @@ void GL_RenderUnshadedModelPart(const ModelDefinition *model,
 						  (void *)(5 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(unshadedModelColorLoc);
 
-	glDrawElements(GL_TRIANGLES, (int)model->lods[lod]->indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
+	glDrawElements(GL_TRIANGLES, (int)model->lods[lod].indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
 }
 
 void GL_RenderSkyModelPart(const ModelDefinition *model,
@@ -464,7 +464,7 @@ void GL_RenderSkyModelPart(const ModelDefinition *model,
 	glVertexAttribPointer(skyColorLoc, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(GLfloat), (void *)(5 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(skyColorLoc);
 
-	glDrawElements(GL_TRIANGLES, (int)model->lods[lod]->indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
+	glDrawElements(GL_TRIANGLES, (int)model->lods[lod].indexCount[materialIndex], GL_UNSIGNED_INT, NULL);
 }
 
 void GL_RenderModel(const ModelDefinition *model,
@@ -473,10 +473,10 @@ void GL_RenderModel(const ModelDefinition *model,
 					const uint32_t lod,
 					const Color modColor)
 {
-	for (uint32_t material = 0; material < model->materialsPerSkin; material++)
+	for (uint32_t material = 0; material < model->materialSlotCount; material++)
 	{
 		const uint32_t realSkin = min(skin, model->skinCount - 1);
-		const uint32_t *skinIndices = model->skins[realSkin];
+		const uint32_t *skinIndices = model->skinMaterialIndices[realSkin];
 		const Material mat = model->materials[skinIndices[material]];
 		switch (mat.shader)
 		{
@@ -612,9 +612,9 @@ void GL_SetMapParams(mat4 *modelViewProjection, const Map *map)
 	uniforms.lightColor[1] = map->lightColor.g;
 	uniforms.lightColor[2] = map->lightColor.b;
 
-	uniforms.lightDirection[0] = -cosf(map->lightAngle.x) * sinf(map->lightAngle.y);
-	uniforms.lightDirection[1] = sinf(map->lightAngle.x);
-	uniforms.lightDirection[2] = -cosf(map->lightAngle.x) * cosf(map->lightAngle.y);
+	uniforms.lightDirection[0] = -cosf(map->lightPitch) * sinf(map->lightYaw);
+	uniforms.lightDirection[1] = sinf(map->lightPitch);
+	uniforms.lightDirection[2] = -cosf(map->lightPitch) * cosf(map->lightYaw);
 
 	glBindBuffer(GL_UNIFORM_BUFFER, sharedUniformBuffer);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(GL_SharedUniforms), &uniforms, GL_STREAM_DRAW);

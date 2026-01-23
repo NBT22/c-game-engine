@@ -31,7 +31,13 @@ fetch_glew()
 fetch_dict()
 
 message(STATUS "Fetching Luna...")
-fetch_package_tag(https://github.com/NBT22/Luna "v0.2.*" Luna)
+FetchContent_Declare(
+        Luna
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/../Luna
+        EXCLUDE_FROM_ALL
+        SYSTEM
+)
+FetchContent_MakeAvailable(Luna)
 if (x86_64)
     fetch_discord_sdk()
 endif ()
@@ -121,8 +127,6 @@ target_sources(engine INTERFACE
         include/engine/graphics/RenderingHelpers.h
         src/graphics/vulkan/Vulkan.c
         include/engine/graphics/vulkan/Vulkan.h
-        src/graphics/vulkan/VulkanActors.c
-        include/engine/graphics/vulkan/VulkanActors.h
         src/graphics/vulkan/VulkanHelpers.c
         include/engine/graphics/vulkan/VulkanHelpers.h
         src/graphics/vulkan/VulkanInternal.c

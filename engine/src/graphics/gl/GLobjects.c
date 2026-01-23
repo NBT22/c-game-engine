@@ -231,16 +231,16 @@ void GL_LoadModel(const ModelDefinition *model, const uint32_t lod, const size_t
 	GL_ModelBuffers *buf = malloc(sizeof(GL_ModelBuffers));
 	CheckAlloc(buf);
 	buf->lodCount = model->lodCount;
-	buf->materialCount = model->materialsPerSkin;
+	buf->materialSlotCount = model->materialSlotCount;
 	buf->buffers = malloc(sizeof(GL_Buffer *) * model->lodCount);
 	CheckAlloc(buf->buffers);
 
 	for (uint32_t l = 0; l < buf->lodCount; l++)
 	{
-		buf->buffers[l] = malloc(sizeof(GL_Buffer) * model->materialsPerSkin);
+		buf->buffers[l] = malloc(sizeof(GL_Buffer) * model->materialSlotCount);
 		CheckAlloc(buf->buffers[l]);
 
-		for (uint32_t m = 0; m < buf->materialCount; m++)
+		for (uint32_t m = 0; m < buf->materialSlotCount; m++)
 		{
 			GL_Buffer *modelBuffer = &buf->buffers[l][m];
 			glGenVertexArrays(1, &modelBuffer->vertexArrayObject);
@@ -249,12 +249,12 @@ void GL_LoadModel(const ModelDefinition *model, const uint32_t lod, const size_t
 
 			GL_BindBuffer(modelBuffer);
 			glBufferData(GL_ARRAY_BUFFER,
-						 (long)(model->lods[l]->vertexCount * sizeof(float) * 12),
-						 model->lods[l]->vertexData,
+						 (long)(model->lods[l].vertexCount * sizeof(ModelVertex)),
+						 model->lods[l].vertexData,
 						 GL_STATIC_DRAW);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-						 (long)(model->lods[l]->indexCount[m] * sizeof(uint32_t)),
-						 model->lods[l]->indexData[m],
+						 (long)(model->lods[l].indexCount[m] * sizeof(uint32_t)),
+						 model->lods[l].indexData[m],
 						 GL_STATIC_DRAW);
 		}
 	}

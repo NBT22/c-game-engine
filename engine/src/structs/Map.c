@@ -36,10 +36,6 @@ Map *CreateMap(void)
 	map->fogColor = COLOR(0xff000000);
 	map->fogStart = 2000;
 	map->fogEnd = 2500;
-	map->discordRpcIcon = NULL;
-	map->discordRpcName = NULL;
-	map->skyTexture = NULL;
-	map->lightAngle = v2s(0);
 	map->lightColor = COLOR_WHITE;
 	map->physicsTick = 0;
 	map->changeFlags = 0;

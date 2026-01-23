@@ -30,11 +30,12 @@
 
 static SDL_Window *vulkanWindow;
 static VkSurfaceKHR surface;
-static VkPhysicalDeviceLimits physicalDeviceLimits;
+static VkPhysicalDeviceProperties physicalDeviceProperties;
 
 bool CreateInstance(SDL_Window *window)
 {
 	vulkanWindow = window;
+
 	uint32_t extensionCount = 0;
 	// const char *extensionNames[extensionCount];
 	char const * const *extensionNames = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
@@ -43,6 +44,7 @@ bool CreateInstance(SDL_Window *window)
 		VulkanLogError("Failed to acquire extensions required for SDL window!\n");
 		return false;
 	}
+
 	const LunaInstanceCreationInfo instanceCreationInfo = {
 		.apiVersion = VK_API_VERSION_1_2,
 
@@ -71,13 +73,16 @@ bool CreateSurface()
 
 bool CreateLogicalDevice()
 {
+	const LunaPhysicalDevicePreferenceDefinition devicePreferenceDefinition = {
+		.preferredDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+	};
 	const VkPhysicalDeviceFeatures vulkan10Features = {
+		.samplerAnisotropy = VK_TRUE,
 		.multiDrawIndirect = VK_TRUE,
 		.drawIndirectFirstInstance = VK_TRUE,
 	};
 	VkPhysicalDeviceVulkan12Features vulkan12Features = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.descriptorIndexing = VK_TRUE,
 		.runtimeDescriptorArray = VK_TRUE,
 		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
 		.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
@@ -87,24 +92,20 @@ bool CreateLogicalDevice()
 		.pNext = &vulkan12Features,
 		.features = vulkan10Features,
 	};
-	const LunaPhysicalDevicePreferenceDefinition devicePreferenceDefinition = {
-		.preferredDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
-	};
 	const LunaDeviceCreationInfo2 deviceCreationInfo = {
-		.extensionCount = 3,
-		.extensionNames = (const char *const[]){VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-												"VK_KHR_maintenance3",
-												"VK_EXT_descriptor_indexing"},
+		.extensionCount = 1,
+		.extensionNames = (const char *const[]){VK_KHR_SWAPCHAIN_EXTENSION_NAME},
 		.requiredFeatures = requiredFeatures,
 		.surface = surface,
 		.physicalDevicePreferenceDefinition = &devicePreferenceDefinition,
 	};
-	VulkanTest(lunaAddNewDevice2(&deviceCreationInfo), "Failed to create logical device!");
-	physicalDeviceLimits = lunaGetPhysicalDeviceProperties().limits;
-	assert(sizeof(PushConstants) <= physicalDeviceLimits.maxPushConstantsSize);
+	VulkanTest(lunaCreateDevice2(&deviceCreationInfo), "Failed to create logical device!");
+	lunaGetPhysicalDeviceProperties(&physicalDeviceProperties);
+	// TODO: Additional checks, and change from assert to a failure that allows GL to take over
 	return true;
 }
 
+// TODO: In-depth review of this function, or rewrite from the ground up
 bool CreateSwapchain()
 {
 	if (minimized)
@@ -170,7 +171,8 @@ bool CreateRenderPass()
 {
 	// TODO: Once Luna supports it, prefer using VK_FORMAT_D32_SFLOAT
 	//  Also ensure that that is the best format for all drivers, not just for NVIDIA
-	lunaSetDepthImageFormat(2, (VkFormat[]){VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT});
+	VulkanTest(lunaSetDepthImageFormat(2, (VkFormat[]){VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT}),
+			   "Failed to set depth image format!");
 
 	switch (GetState()->options.msaa)
 	{
@@ -188,21 +190,23 @@ bool CreateRenderPass()
 			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 	}
-	if (!(physicalDeviceLimits.framebufferColorSampleCounts &
-		  physicalDeviceLimits.framebufferDepthSampleCounts &
+	if (!(physicalDeviceProperties.limits.framebufferColorSampleCounts &
+		  physicalDeviceProperties.limits.framebufferDepthSampleCounts &
 		  msaaSamples))
 	{
-		while (!(physicalDeviceLimits.framebufferColorSampleCounts &
-				 physicalDeviceLimits.framebufferDepthSampleCounts &
+		while (!(physicalDeviceProperties.limits.framebufferColorSampleCounts &
+				 physicalDeviceProperties.limits.framebufferDepthSampleCounts &
 				 msaaSamples))
 		{
 			msaaSamples >>= 1;
 			if (msaaSamples == 0)
 			{
-				VulkanLogError("Found device does not support sampling the image even once.");
+				VulkanLogError("Found device does not support sampling the image even once. "
+							   "This indicates an issue with the graphics driver.");
 				return false;
 			}
 		}
+		// TODO: This doesn't update the options and it doesn't tell the user what to change their MSAA level to
 		ShowWarning("Invalid Settings",
 					"Your GPU driver does not support the selected MSAA level!\n"
 					"A fallback has been set to avoid issues.");
@@ -211,8 +215,9 @@ bool CreateRenderPass()
 	const LunaSubpassCreationInfo subpassCreationInfo = {
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.useColorAttachment = true,
-		.useDepthAttachment = true,
+		.useDepthAttachment = true, // TODO: Look into disabling this for UI
 	};
+	// TODO: Check that these stages are actually accurate
 	VkSubpassDependency dependency = {
 		.srcSubpass = VK_SUBPASS_EXTERNAL,
 		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -225,9 +230,9 @@ bool CreateRenderPass()
 	const LunaRenderPassCreationInfo renderPassCreationInfo = {
 		.samples = msaaSamples,
 		.createColorAttachment = true,
-		.colorAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_CLEAR,
+		.colorAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_MODE_CLEAR,
 		.createDepthAttachment = true,
-		.depthAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_CLEAR,
+		.depthAttachmentLoadMode = LUNA_ATTACHMENT_LOAD_MODE_CLEAR,
 		.subpassCount = 1,
 		.subpasses = &subpassCreationInfo,
 		.dependencyCount = 1,
@@ -239,19 +244,41 @@ bool CreateRenderPass()
 	return true;
 }
 
+// TODO: Look into using uniform texel buffers instead of image samplers to drop dependency on non-uniform indexing
 bool CreateDescriptorSetLayouts()
 {
-	const LunaDescriptorSetLayoutBinding binding = {
-		.bindingName = "Textures",
-		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = MAX_TEXTURES,
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.bindingFlags = 1,
+	// TODO: Use inline uniform block if available
+	const LunaDescriptorSetLayoutBinding bindings[] = {
+		{
+			.bindingName = "Textures",
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_TEXTURES,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+		},
+		{
+			.bindingName = "Camera",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		},
+		{
+			.bindingName = "Global Lighting",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
+		{
+			.bindingName = "Fog",
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		},
 	};
 	const LunaDescriptorSetLayoutCreationInfo descriptorSetLayoutCreationInfo = {
-		.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-		.bindingCount = 1,
-		.bindings = &binding,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+		.bindingCount = sizeof(bindings) / sizeof(*bindings),
+		.bindings = bindings,
 	};
 	VulkanTest(lunaCreateDescriptorSetLayout(&descriptorSetLayoutCreationInfo, &descriptorSetLayout),
 			   "Failed to create pipeline descriptor set layout!");
@@ -261,55 +288,135 @@ bool CreateDescriptorSetLayouts()
 
 bool CreateTextureSamplers()
 {
-	const LunaSamplerCreationInfo linearRepeatSamplerCreateInfo = {
+	float maxAnisotropy = 0;
+	switch (GetState()->options.anisotropy)
+	{
+		case ANISOTROPY_2X:
+			maxAnisotropy = 2;
+			break;
+		case ANISOTROPY_4X:
+			maxAnisotropy = 4;
+			break;
+		case ANISOTROPY_8X:
+			maxAnisotropy = 8;
+			break;
+		case ANISOTROPY_16X:
+			maxAnisotropy = 16;
+			break;
+		default:
+			break;
+	}
+	maxAnisotropy = max(maxAnisotropy, physicalDeviceProperties.limits.maxSamplerAnisotropy);
+	const LunaSamplerCreationInfo linearRepeatSamplerAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_LINEAR,
 		.minFilter = VK_FILTER_LINEAR,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
-	const LunaSamplerCreationInfo nearestRepeatSamplerCreateInfo = {
+	const LunaSamplerCreationInfo nearestRepeatSamplerAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_NEAREST,
 		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
-	const LunaSamplerCreationInfo linearNoRepeatSamplerCreateInfo = {
+	const LunaSamplerCreationInfo linearNoRepeatSamplerAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_LINEAR,
 		.minFilter = VK_FILTER_LINEAR,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestNoRepeatSamplerAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipmapLodBias = -1.5f,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
 
-	const LunaSamplerCreationInfo nearestNoRepeatSamplerCreateInfo = {
+	const LunaSamplerCreationInfo linearRepeatSamplerNoAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.mipmapLodBias = -1.5f,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestRepeatSamplerNoAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.mipmapLodBias = -1.5f,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo linearNoRepeatSamplerNoAnisotropyCreateInfo = {
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.mipmapLodBias = -1.5f,
+		.maxLod = VK_LOD_CLAMP_NONE,
+	};
+	const LunaSamplerCreationInfo nearestNoRepeatSamplerNoAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_NEAREST,
 		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -1.5f,
+		.mipmapLodBias = -1.5f,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
-	VulkanTest(lunaCreateSampler(&linearRepeatSamplerCreateInfo, &textureSamplers.linearRepeat),
-			   "Failed to create linear repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerCreateInfo, &textureSamplers.nearestRepeat),
-			   "Failed to create nearest repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerCreateInfo, &textureSamplers.linearNoRepeat),
-			   "Failed to create linear non-repeating texture sampler!");
-	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerCreateInfo, &textureSamplers.nearestNoRepeat),
-			   "Failed to create nearest non-repeating texture sampler!");
+
+	VulkanTest(lunaCreateSampler(&linearRepeatSamplerAnisotropyCreateInfo, &textureSamplers.linearRepeatAnisotropy),
+			   "Failed to create linear repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerAnisotropyCreateInfo, &textureSamplers.nearestRepeatAnisotropy),
+			   "Failed to create nearest repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerAnisotropyCreateInfo, &textureSamplers.linearNoRepeatAnisotropy),
+			   "Failed to create linear non-repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerAnisotropyCreateInfo,
+								 &textureSamplers.nearestNoRepeatAnisotropy),
+			   "Failed to create nearest non-repeating anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearRepeatSamplerNoAnisotropyCreateInfo, &textureSamplers.linearRepeatNoAnisotropy),
+			   "Failed to create linear repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.nearestRepeatNoAnisotropy),
+			   "Failed to create nearest repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&linearNoRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.linearNoRepeatNoAnisotropy),
+			   "Failed to create linear non-repeating no anisotropy texture sampler!");
+	VulkanTest(lunaCreateSampler(&nearestNoRepeatSamplerNoAnisotropyCreateInfo,
+								 &textureSamplers.nearestNoRepeatNoAnisotropy),
+			   "Failed to create nearest non-repeating no anisotropy texture sampler!");
 
 	ListInit(textures, LIST_POINTER);
 	memset(imageAssetIdToIndexMap, -1, sizeof(*imageAssetIdToIndexMap) * MAX_TEXTURES);
@@ -320,42 +427,73 @@ bool CreateTextureSamplers()
 bool CreateBuffers()
 {
 	VulkanTest(CreateUiBuffers(), "Failed to create UI buffers!");
-	VulkanTest(CreateViewModelBuffers(), "Failed to create view model buffers!");
-	VulkanTest(CreateWallBuffers(), "Failed to create wall buffers!");
-	VulkanTest(CreateActorWallBuffers(), "Failed to create wall actor buffers!");
-	VulkanTest(CreateActorModelBuffers(), "Failed to create model actor buffers!");
+	VulkanTest(CreateUniformBuffers(), "Failed to create uniform buffers!");
+	VulkanTest(CreateMapBuffers(), "Failed to create map buffers!");
+	VulkanTest(CreateSkyBuffers(), "Failed to create sky buffers!");
+	VulkanTest(CreateViewmodelBuffers(), "Failed to create viewmodel buffers!");
 	VulkanTest(CreateDebugDrawBuffers(), "Failed to create debug draw buffers!");
 
 	return true;
 }
 
-bool CreateDescriptorSets()
+// TODO: Revisit this to ensure it's as it should be (update after bind flag or usage of MAX_FRAMES_IN_FLIGHT, for example)
+bool CreateDescriptorSet()
 {
 	LunaDescriptorPool descriptorPool = LUNA_NULL_HANDLE;
-	const VkDescriptorPoolSize poolSize = {
-		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = MAX_TEXTURES * MAX_FRAMES_IN_FLIGHT,
+	const VkDescriptorPoolSize poolSizes[] = {
+		{
+			.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = MAX_TEXTURES,
+		},
+		{
+			.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 3,
+		},
 	};
 	const LunaDescriptorPoolCreationInfo descriptorPoolCreationInfo = {
 		.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-		.maxSets = MAX_FRAMES_IN_FLIGHT,
-		.poolSizeCount = 1,
-		.poolSizes = &poolSize,
+		.maxSets = 1,
+		.poolSizeCount = sizeof(poolSizes) / sizeof(*poolSizes),
+		.poolSizes = poolSizes,
 	};
 	VulkanTest(lunaCreateDescriptorPool(&descriptorPoolCreationInfo, &descriptorPool),
 			   "Failed to create descriptor pool!");
 
-	LunaDescriptorSetLayout layouts[MAX_FRAMES_IN_FLIGHT];
-	for (uint8_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		layouts[i] = descriptorSetLayout;
-	}
 	const LunaDescriptorSetAllocationInfo allocationInfo = {
 		.descriptorPool = descriptorPool,
-		.descriptorSetCount = MAX_FRAMES_IN_FLIGHT,
-		.setLayouts = layouts,
+		.descriptorSetCount = 1,
+		.setLayouts = &descriptorSetLayout,
 	};
-	VulkanTest(lunaAllocateDescriptorSets(&allocationInfo, descriptorSets), "Failed to allocate descriptor sets!");
+	VulkanTest(lunaAllocateDescriptorSets(&allocationInfo, &descriptorSet), "Failed to allocate descriptor sets!");
+
+	const LunaDescriptorBufferInfo transformMatrixBufferInfo = {
+		.buffer = buffers.uniforms.camera,
+	};
+	const LunaWriteDescriptorSet transformMatrixWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Camera",
+		.descriptorCount = 1,
+		.bufferInfo = &transformMatrixBufferInfo,
+	};
+	const LunaDescriptorBufferInfo lightingBufferInfo = {
+		.buffer = buffers.uniforms.lighting,
+	};
+	const LunaWriteDescriptorSet lightingWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Global Lighting",
+		.descriptorCount = 1,
+		.bufferInfo = &lightingBufferInfo,
+	};
+	const LunaDescriptorBufferInfo fogBufferInfo = {
+		.buffer = buffers.uniforms.fog,
+	};
+	const LunaWriteDescriptorSet fogWrite = {
+		.descriptorSet = descriptorSet,
+		.bindingName = "Fog",
+		.descriptorCount = 1,
+		.bufferInfo = &fogBufferInfo,
+	};
+	lunaWriteDescriptorSets(3, (LunaWriteDescriptorSet[]){transformMatrixWrite, lightingWrite, fogWrite});
 
 	return true;
 }

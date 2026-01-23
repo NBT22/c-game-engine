@@ -23,12 +23,9 @@
 #include <vulkan/vulkan_core.h>
 
 #pragma region macros
-#define MAX_FRAMES_IN_FLIGHT 1
-#define MAX_UI_QUADS_INIT 8192 // TODO: find best value (and a fix for resizing the buffer mid-frame)
-#define MAX_WALLS_INIT 1024
-#define MAX_WALL_ACTORS_INIT 1
-#define MAX_MODEL_ACTOR_QUADS_INIT 1
+#ifdef JPH_DEBUG_RENDERER
 #define MAX_DEBUG_DRAW_VERTICES_INIT 1024
+#endif
 
 #define VulkanLogError(...) LogInternal("VULKAN", 31, true, __VA_ARGS__)
 // TODO Use LogInternal
@@ -84,6 +81,17 @@ enum VendorIDs
 	QUALCOMM = 0x5143,
 };
 
+enum PendingTasksBitFlags
+{
+	PENDING_TASK_UI_BUFFERS_RESIZE_BIT = 1 << 0,
+};
+
+typedef struct CameraUniform
+{
+	mat4 transform;
+	Vector3 position;
+} CameraUniform;
+
 typedef struct UiVertex
 {
 	float x;
@@ -100,74 +108,13 @@ typedef struct UiVertex
 	uint32_t textureIndex;
 } UiVertex;
 
-typedef struct ModelVertex
-{
-	/// The position of the vertex in local space
-	Vector3 position;
-
-	/// The u component of the vertex's uv
-	float u;
-	/// The v component of the vertex's uv
-	float v;
-
-	/// The color of the vertex
-	Color color;
-
-	/// The normal of the vertex
-	Vector3 normal;
-} ModelVertex;
-
-typedef struct ModelInstanceData
-{
-	/// The instance's transformation matrix.
-	mat4 transform;
-	/// The instance's texture index.
-	uint32_t textureIndex;
-	/// The color of the instance, given by the material
-	Color materialColor;
-	/// The color of the instance, specified per-instance (such as by Actor::modColor)
-	Color instanceColor;
-} ModelInstanceData;
-
 typedef struct SkyVertex
 {
+	/// The position of the vertex, in model space
 	Vector3 position;
-
-	float u;
-	float v;
+	/// The texture coordinate of the vertex
+	Vector2 uv;
 } SkyVertex;
-
-typedef struct WallVertex
-{
-	Vector3 position;
-
-	float u;
-	float v;
-
-	uint32_t textureIndex; // TODO Per-vertex is less than ideal
-	float wallAngle;
-} WallVertex;
-
-typedef struct ActorWallVertex
-{
-	/// The position of the vertex in local space
-	Vector3 position;
-
-	/// The u component of the vertex's uv
-	float u;
-	/// The v component of the vertex's uv
-	float v;
-} ActorWallVertex;
-
-typedef struct ActorWallInstanceData
-{
-	/// The instance's transformation matrix.
-	mat4 transform;
-	/// The instance's texture index.
-	uint32_t textureIndex;
-	/// The instance's rotation.
-	float wallAngle;
-} ActorWallInstanceData;
 
 typedef struct DebugDrawVertex
 {
@@ -175,79 +122,83 @@ typedef struct DebugDrawVertex
 	Color color;
 } DebugDrawVertex;
 
-typedef struct BufferRegion
+typedef struct ModelInstanceData
 {
-	LunaBuffer buffer;
-	VkDeviceSize bytesUsed;
-	VkDeviceSize allocatedSize;
-	void *data;
-} BufferRegion;
+	mat4 transformMatrix;
+	uint32_t textureIndex;
+} ModelInstanceData;
 
+typedef struct ActorModelInstanceData
+{
+	mat4 transformMatrix;
+	float modColor;
+	uint32_t textureIndex;
+} ActorModelInstanceData;
+
+// TODO: Should this be changed or is it ok
 typedef struct UiBuffer
 {
-	BufferRegion vertices;
-	BufferRegion indices;
-	bool shouldResize;
+	LunaBuffer vertexBuffer;
+	LunaBuffer indexBuffer;
+	uint32_t allocatedQuads;
+	uint32_t freeQuads;
+	UiVertex *vertexData;
+	uint32_t *indexData;
 } UiBuffer;
 
-typedef struct ViewModelBuffer
+typedef struct UniformBuffers
 {
+	LunaBuffer camera;
+	LunaBuffer lighting;
+	LunaBuffer fog;
+} UniformBuffers;
+
+/// Contains the required buffers for a model that can have multiple materials
+typedef struct ModelBuffer // TODO: Reorder for memory locality
+{
+	/// A buffer containing per-vertex data
 	LunaBuffer vertices;
+	/// A buffer containing the index data to use along-side the per-vertex data
 	LunaBuffer indices;
-	LunaBuffer instanceDataBuffer;
-	ModelInstanceData *instanceDatas;
-	LunaBuffer drawInfo;
-	uint32_t drawCount;
-} ViewModelBuffer;
+	/// A buffer containing data that only needs to exist once per shaded material
+	LunaBuffer perShadedMaterial;
+	/// A buffer containing data that only needs to exist once per unshaded material
+	LunaBuffer perUnshadedMaterial;
+	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the shaded materials draw call
+	LunaBuffer shadedDrawInfo;
+	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the unshaded materials draw call
+	LunaBuffer unshadedDrawInfo;
+} ModelBuffer;
 
 typedef struct SkyBuffer
 {
-	BufferRegion vertices;
-	BufferRegion indices;
-	uint32_t indexCount;
+	LunaBuffer vertices;
+	LunaBuffer indices;
 } SkyBuffer;
 
-typedef struct WallsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-} WallsBuffer;
-
-typedef struct ActorWallsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-	BufferRegion instanceData;
-	BufferRegion drawInfo;
-	VkDeviceSize count;
-} ActorWallsBuffer;
-
-typedef struct ActorModelsBuffer
-{
-	BufferRegion vertices;
-	BufferRegion indices;
-	BufferRegion instanceData;
-	BufferRegion shadedDrawInfo;
-	BufferRegion unshadedDrawInfo;
-
-	List loadedModelIds;
-} ActorModelsBuffer;
-
+#ifdef JPH_DEBUG_RENDERER
+// TODO: Clean up both this and the whole system
 typedef struct DebugDrawBuffer
 {
-	BufferRegion vertices;
+	struct
+	{
+		LunaBuffer buffer;
+		VkDeviceSize bytesUsed;
+		VkDeviceSize allocatedSize;
+		void *data;
+	} vertices;
 	uint32_t vertexCount;
 	bool shouldResize;
 } DebugDrawBuffer;
+#endif
 
 typedef struct Buffers
 {
 	UiBuffer ui;
-	ViewModelBuffer viewModel;
+	UniformBuffers uniforms;
+	ModelBuffer map;
+	ModelBuffer viewmodel;
 	SkyBuffer sky;
-	WallsBuffer walls;
-	ActorWallsBuffer actorWalls;
-	ActorModelsBuffer actorModels;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
 	DebugDrawBuffer debugDrawTriangles;
@@ -257,13 +208,11 @@ typedef struct Buffers
 typedef struct Pipelines
 {
 	LunaGraphicsPipeline ui;
-	LunaGraphicsPipeline viewModel;
+	LunaGraphicsPipeline shadedMap;
+	LunaGraphicsPipeline unshadedMap;
 	LunaGraphicsPipeline sky;
-	LunaGraphicsPipeline floorAndCeiling;
-	LunaGraphicsPipeline walls;
-	LunaGraphicsPipeline actorWalls;
-	LunaGraphicsPipeline shadedActorModels;
-	LunaGraphicsPipeline unshadedActorModels;
+	LunaGraphicsPipeline shadedViewmodel;
+	LunaGraphicsPipeline unshadedViewmodel;
 #ifdef JPH_DEBUG_RENDERER
 	LunaGraphicsPipeline debugDrawLines;
 	LunaGraphicsPipeline debugDrawTriangles;
@@ -272,38 +221,41 @@ typedef struct Pipelines
 
 typedef struct TextureSamplers
 {
-	LunaSampler linearRepeat;
-	LunaSampler nearestRepeat;
-	LunaSampler linearNoRepeat;
-	LunaSampler nearestNoRepeat;
+	LunaSampler linearRepeatAnisotropy;
+	LunaSampler nearestRepeatAnisotropy;
+	LunaSampler linearNoRepeatAnisotropy;
+	LunaSampler nearestNoRepeatAnisotropy;
+	LunaSampler linearRepeatNoAnisotropy;
+	LunaSampler nearestRepeatNoAnisotropy;
+	LunaSampler linearNoRepeatNoAnisotropy;
+	LunaSampler nearestNoRepeatNoAnisotropy;
 } TextureSamplers;
 
-typedef struct __attribute__((aligned(16))) PushConstants
+typedef struct DescriptorSetLayouts
 {
-	mat4 transformMatrix;
-	Color fogColor;
-	Vector3 cameraPosition;
-	uint32_t roofTextureIndex;
-	uint32_t floorTextureIndex;
-	float yaw;
-	float fogStart;
-	float fogEnd;
-} PushConstants;
+	LunaDescriptorSetLayout transform;
+	LunaDescriptorSetLayout all;
+	LunaDescriptorSetLayout globalLighting;
+	LunaDescriptorSetLayout fog;
+} DescriptorSetLayouts;
 #pragma endregion typedefs
 
 #pragma region variables
+// TODO: Make sure these are all needed and are all as they should be
+
 extern bool minimized;
 extern VkExtent2D swapChainExtent;
 extern VkSampleCountFlagBits msaaSamples;
-extern LockingList textures;
-extern uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
-extern LunaDescriptorSetLayout descriptorSetLayout;
-extern LunaDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
-extern TextureSamplers textureSamplers;
-extern PushConstants pushConstants;
 extern LunaRenderPass renderPass;
-extern Pipelines pipelines;
+extern uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
+extern TextureSamplers textureSamplers;
+extern LockingList textures;
+extern LunaDescriptorSetLayout descriptorSetLayout;
+extern LunaDescriptorSet descriptorSet;
 extern Buffers buffers;
+extern Pipelines pipelines;
+extern uint32_t pendingTasks; // Bits set with PendingTasksBitFlags
+extern uint32_t skyTextureIndex;
 #pragma endregion variables
 
 VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderModule *shaderModule);
@@ -312,15 +264,11 @@ uint32_t TextureIndex(const char *texture);
 
 uint32_t ImageIndex(const Image *image);
 
-VkResult LoadSky(const ModelDefinition *skyModel);
+VkResult UpdateCameraUniform(const Camera *camera);
 
-void LoadWalls(const Map *level);
+VkResult UpdateViewModelMatrix(const Viewmodel *viewmodel);
 
-void UpdateTransformMatrix(const Camera *camera);
-
-void UpdateViewModelMatrix(const Viewmodel *viewmodel);
-
-void EnsureSpaceForUiElements(size_t vertexCount, size_t indexCount);
+void EnsureSpaceForUiElements(size_t quadCount);
 
 void DrawRectInternal(float ndcStartX,
 					  float ndcStartY,

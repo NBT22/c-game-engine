@@ -34,6 +34,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "actor/TestActor.h"
+
 Map *LoadMap(const char *path)
 {
 	Map *map = CreateMap();

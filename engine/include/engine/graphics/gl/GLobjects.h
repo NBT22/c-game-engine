@@ -50,7 +50,7 @@ struct GL_ModelBuffers
 	/// The number of LODs in this buffer
 	uint32_t lodCount;
 	/// The number of materials in this buffer
-	uint32_t materialCount;
+	uint32_t materialSlotCount;
 	/// The buffers, indexed by LOD then material
 	GL_Buffer **buffers;
 };

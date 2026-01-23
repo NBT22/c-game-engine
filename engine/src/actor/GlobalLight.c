@@ -30,8 +30,9 @@ static uint64_t interpolationStartTick = 0;
 
 typedef struct GlobalLightData
 {
-	Vector2 lightAngle;
-	Color lightColor;
+	float pitch;
+	float yaw;
+	Color color;
 	int interpolationTicks;
 	bool startOn;
 } GlobalLightData;
@@ -43,9 +44,9 @@ void GlobalLightInit(Actor *this, const KvList params, Transform *transform)
 	GlobalLightData *data = this->extraData;
 	Vector3 euler;
 	JPH_Quat_GetEulerAngles(&transform->rotation, &euler);
-	data->lightAngle.x = euler.x;
-	data->lightAngle.y = euler.y;
-	data->lightColor = KvGetColor(params, "light_color", COLOR_WHITE);
+	data->pitch = euler.x;
+	data->yaw = euler.y;
+	data->color = KvGetColor(params, "light_color", COLOR_WHITE);
 	data->interpolationTicks = KvGetInt(params, "interpolation_ticks", PHYSICS_TARGET_TPS);
 	data->startOn = KvGetBool(params, "start_on", true);
 }
@@ -55,8 +56,9 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 	GlobalLightData *data = this->extraData;
 	if (data->startOn)
 	{
-		GetState()->map->lightAngle = data->lightAngle;
-		GetState()->map->lightColor = data->lightColor;
+		GetState()->map->lightPitch = data->pitch;
+		GetState()->map->lightYaw = data->yaw;
+		GetState()->map->lightColor = data->color;
 		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 		data->startOn = false;
 	}
@@ -65,12 +67,12 @@ static void GlobalLightUpdate(Actor *this, double /*delta*/)
 	{
 		const int ticksIntoInterpolation = (int)(GetState()->map->physicsTick - interpolationStartTick);
 		const float interpolationFactor = (1.0f / (float)data->interpolationTicks) * (float)ticksIntoInterpolation;
-		GetState()->map->lightAngle.x = lerp(interpolationPreviousPitch, data->lightAngle.x, interpolationFactor);
-		GetState()->map->lightAngle.y = lerp(interpolationPreviousYaw, data->lightAngle.y, interpolationFactor);
-		GetState()->map->lightColor.r = lerp(interpolationPreviousColor.r, data->lightColor.r, interpolationFactor);
-		GetState()->map->lightColor.g = lerp(interpolationPreviousColor.g, data->lightColor.g, interpolationFactor);
-		GetState()->map->lightColor.b = lerp(interpolationPreviousColor.b, data->lightColor.b, interpolationFactor);
-		GetState()->map->lightColor.a = lerp(interpolationPreviousColor.a, data->lightColor.a, interpolationFactor);
+		GetState()->map->lightPitch = lerp(interpolationPreviousPitch, data->pitch, interpolationFactor);
+		GetState()->map->lightYaw = lerp(interpolationPreviousYaw, data->yaw, interpolationFactor);
+		GetState()->map->lightColor.r = lerp(interpolationPreviousColor.r, data->color.r, interpolationFactor);
+		GetState()->map->lightColor.g = lerp(interpolationPreviousColor.g, data->color.g, interpolationFactor);
+		GetState()->map->lightColor.b = lerp(interpolationPreviousColor.b, data->color.b, interpolationFactor);
+		GetState()->map->lightColor.a = lerp(interpolationPreviousColor.a, data->color.a, interpolationFactor);
 		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 		if (ticksIntoInterpolation == data->interpolationTicks)
 		{
@@ -85,16 +87,17 @@ static void GlobalLightSetHandler(Actor *this, const Actor * /*sender*/, const P
 	if (data->interpolationTicks == 0)
 	{
 		interpolatingActor = NULL; // stop any existing interpolation, but don't start a new one
-		GetState()->map->lightAngle = data->lightAngle;
-		GetState()->map->lightColor = data->lightColor;
+		GetState()->map->lightPitch = data->pitch;
+		GetState()->map->lightYaw = data->yaw;
+		GetState()->map->lightColor = data->color;
 		GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 	} else
 	{
 		interpolatingActor = this;
 		interpolationStartTick = GetState()->map->physicsTick;
 		interpolationPreviousColor = GetState()->map->lightColor;
-		interpolationPreviousPitch = GetState()->map->lightAngle.x;
-		interpolationPreviousYaw = GetState()->map->lightAngle.y;
+		interpolationPreviousPitch = GetState()->map->lightPitch;
+		interpolationPreviousYaw = GetState()->map->lightYaw;
 	}
 }
 
@@ -102,8 +105,9 @@ static void GlobalLightSetInstantHandler(Actor *this, const Actor * /*sender*/, 
 {
 	const GlobalLightData *data = this->extraData;
 	interpolatingActor = NULL; // stop any existing interpolation, but don't start a new one
-	GetState()->map->lightAngle = data->lightAngle;
-	GetState()->map->lightColor = data->lightColor;
+	GetState()->map->lightPitch = data->pitch;
+	GetState()->map->lightYaw = data->yaw;
+	GetState()->map->lightColor = data->color;
 	GetState()->map->changeFlags |= MAP_LIGHT_CHANGED;
 }
 

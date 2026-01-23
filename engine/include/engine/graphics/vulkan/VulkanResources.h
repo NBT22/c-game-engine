@@ -11,23 +11,15 @@
 
 VkResult CreateUiBuffers();
 
-VkResult CreateViewModelBuffers();
+VkResult CreateUniformBuffers();
 
-VkResult CreateWallBuffers();
+VkResult CreateMapBuffers();
 
-VkResult CreateActorWallBuffers();
+VkResult CreateSkyBuffers();
 
-VkResult CreateActorModelBuffers();
+VkResult CreateViewmodelBuffers();
 
 VkResult CreateDebugDrawBuffers();
-
-VkResult ResizeWallBuffers();
-
-VkResult ResizeActorWallBuffers();
-
-VkResult ResizeActorModelInstanceDataBuffer();
-
-VkResult ResizeActorModelBuffers();
 
 VkResult ResizeDebugDrawBuffers();
 
