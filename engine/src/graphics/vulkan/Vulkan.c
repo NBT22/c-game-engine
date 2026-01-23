@@ -144,7 +144,26 @@ static inline VkResult UpdateViewmodel(const Viewmodel *viewmodel)
 static inline VkResult LoadViewmodel(const Viewmodel *viewmodel)
 {
 	const ModelDefinition *model = viewmodel->model;
+	const uint32_t *materialIndices = model->skinMaterialIndices[viewmodel->modelSkin];
 	const ModelLod *lod = model->lods;
+
+	uint32_t indices[lod->totalIndexCount];
+	size_t indexCount = 0;
+	size_t shadedMaterialCount = 0;
+	size_t unshadedMaterialCount = 0;
+	for (size_t i = 0; i < model->materialSlotCount; i++)
+	{
+		memcpy(indices + indexCount, lod->indexData[i], lod->indexCount[i] * sizeof(uint32_t));
+		indexCount += lod->indexCount[i];
+		if (model->materials[materialIndices[i]].shader == SHADER_SHADED)
+		{
+			shadedMaterialCount++;
+		} else
+		{
+			assert(model->materials[materialIndices[i]].shader == SHADER_UNSHADED);
+			unshadedMaterialCount++;
+		}
+	}
 
 	const size_t vertexBufferSize = lod->vertexCount * sizeof(ModelVertex);
 	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.vertices, vertexBufferSize),
@@ -152,14 +171,18 @@ static inline VkResult LoadViewmodel(const Viewmodel *viewmodel)
 	const size_t indexBufferSize = lod->totalIndexCount * sizeof(uint32_t);
 	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.indices, indexBufferSize),
 						   "Failed to resize viewmodel index buffer!");
-
-	uint32_t indices[lod->totalIndexCount];
-	size_t indexCount = 0;
-	for (size_t i = 0; i < model->materialSlotCount; i++)
-	{
-		memcpy(indices + indexCount, lod->indexData[i], lod->indexCount[i] * sizeof(uint32_t));
-		indexCount += lod->indexCount[i];
-	}
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.perShadedMaterial,
+											shadedMaterialCount * sizeof(ModelInstanceData)),
+						   "Failed to resize viewmodel per shaded material buffer!");
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.perUnshadedMaterial,
+											unshadedMaterialCount * sizeof(ModelInstanceData)),
+						   "Failed to resize viewmodel per unshaded material buffer!");
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.shadedDrawInfo,
+											shadedMaterialCount * sizeof(VkDrawIndexedIndirectCommand)),
+						   "Failed to resize viewmodel shaded material draw info buffer!");
+	VulkanTestReturnResult(lunaResizeBuffer(&buffers.viewmodel.unshadedDrawInfo,
+											unshadedMaterialCount * sizeof(VkDrawIndexedIndirectCommand)),
+						   "Failed to resize viewmodel unshaded material draw info buffer!");
 
 	const LunaBufferWriteInfo vertexBufferWriteInfo = {
 		.bytes = vertexBufferSize,
@@ -317,6 +340,108 @@ static inline VkResult LoadMap(const Map *map)
 
 	skyTextureIndex = TextureIndex(map->skyTexture);
 	loadedMap = map;
+
+	return VK_SUCCESS;
+}
+
+static inline VkResult DrawSky(const LunaGraphicsPipelineBindInfo *pipelineBindInfo)
+{
+	if (skyModelIndexCount == 0)
+	{
+		return VK_SUCCESS;
+	}
+
+	VulkanTestReturnResult(lunaPushConstants(pipelines.sky), "Failed to push constants for sky pipeline!");
+	const LunaDrawIndexedInfo skyDrawInfo = {
+		.pipeline = pipelines.sky,
+		.pipelineBindInfo = pipelineBindInfo,
+		.indexCount = skyModelIndexCount,
+		.instanceCount = 1,
+	};
+	VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.sky.vertices,
+												 buffers.sky.indices,
+												 VK_INDEX_TYPE_UINT32,
+												 &skyDrawInfo),
+						   "Failed to draw sky!");
+
+	return VK_SUCCESS;
+}
+
+static inline VkResult DrawMap(const LunaGraphicsPipelineBindInfo *pipelineBindInfo)
+{
+	const size_t shadedDrawCount = lunaGetBufferSize(buffers.map.shadedDrawInfo) / sizeof(VkDrawIndexedIndirectCommand);
+	const size_t unshadedDrawCount = lunaGetBufferSize(buffers.map.unshadedDrawInfo) /
+									 sizeof(VkDrawIndexedIndirectCommand);
+
+	if (shadedDrawCount != 0 || unshadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.map.vertices}, 0, 1);
+		lunaBindIndexBuffer(buffers.map.indices, VK_INDEX_TYPE_UINT32);
+	}
+
+	if (shadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.map.perShadedMaterial}, 1, 1);
+		const LunaDrawIndexedIndirectInfo drawInfo = {
+			.pipeline = pipelines.shadedMap,
+			.pipelineBindInfo = pipelineBindInfo,
+			.buffer = buffers.map.shadedDrawInfo,
+			.drawCount = shadedDrawCount,
+		};
+		VulkanTestReturnResult(lunaDrawIndexedIndirect(&drawInfo), "Failed to draw shaded map!");
+	}
+
+	if (unshadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.map.perUnshadedMaterial}, 1, 1);
+		const LunaDrawIndexedIndirectInfo drawInfo = {
+			.pipeline = pipelines.unshadedMap,
+			.pipelineBindInfo = pipelineBindInfo,
+			.buffer = buffers.map.unshadedDrawInfo,
+			.drawCount = unshadedDrawCount,
+		};
+		VulkanTestReturnResult(lunaDrawIndexedIndirect(&drawInfo), "Failed to draw unshaded map!");
+	}
+
+	return VK_SUCCESS;
+}
+
+static inline VkResult DrawViewmodel(const LunaGraphicsPipelineBindInfo *pipelineBindInfo)
+{
+	const size_t shadedDrawCount = lunaGetBufferSize(buffers.viewmodel.shadedDrawInfo) /
+								   sizeof(VkDrawIndexedIndirectCommand);
+	const size_t unshadedDrawCount = lunaGetBufferSize(buffers.viewmodel.unshadedDrawInfo) /
+									 sizeof(VkDrawIndexedIndirectCommand);
+
+	if (shadedDrawCount != 0 || unshadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.viewmodel.vertices}, 0, 1);
+		lunaBindIndexBuffer(buffers.viewmodel.indices, VK_INDEX_TYPE_UINT32);
+	}
+
+	if (shadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.viewmodel.perShadedMaterial}, 1, 1);
+		const LunaDrawIndexedIndirectInfo drawInfo = {
+			.pipeline = pipelines.shadedViewmodel,
+			.pipelineBindInfo = pipelineBindInfo,
+			.buffer = buffers.viewmodel.shadedDrawInfo,
+			.drawCount = shadedDrawCount,
+		};
+		VulkanTestReturnResult(lunaDrawIndexedIndirect(&drawInfo), "Failed to draw shaded viewmodel!");
+	}
+
+	if (unshadedDrawCount != 0)
+	{
+		lunaBindVertexBuffers((LunaBuffer[]){buffers.viewmodel.perUnshadedMaterial}, 1, 1);
+		const LunaDrawIndexedIndirectInfo drawInfo = {
+			.pipeline = pipelines.unshadedViewmodel,
+			.pipelineBindInfo = pipelineBindInfo,
+			.buffer = buffers.viewmodel.unshadedDrawInfo,
+			.drawCount = unshadedDrawCount,
+		};
+		VulkanTestReturnResult(lunaDrawIndexedIndirect(&drawInfo), "Failed to draw unshaded viewmodel!");
+	}
 
 	return VK_SUCCESS;
 }
@@ -510,57 +635,9 @@ VkResult VK_RenderMap(const Map *map, const Camera *camera)
 		.dynamicStates = dynamicStateBindInfos,
 	};
 
-	VulkanTestReturnResult(lunaPushConstants(pipelines.sky), "Failed to push constants for sky pipeline!");
-	const LunaDrawIndexedInfo skyDrawInfo = {
-		.pipeline = pipelines.sky,
-		.pipelineBindInfo = &pipelineBindInfo,
-		.indexCount = skyModelIndexCount,
-		.instanceCount = 1,
-	};
-	VulkanTestReturnResult(lunaDrawBufferIndexed(buffers.sky.vertices,
-												 buffers.sky.indices,
-												 VK_INDEX_TYPE_UINT32,
-												 &skyDrawInfo),
-						   "Failed to draw sky!");
-
-	lunaBindVertexBuffers((LunaBuffer[]){buffers.map.vertices, buffers.map.perShadedMaterial}, 0, 2);
-	lunaBindIndexBuffer(buffers.map.indices, VK_INDEX_TYPE_UINT32);
-	const LunaDrawIndexedIndirectInfo shadedMapDrawInfo = {
-		.pipeline = pipelines.shadedMap,
-		.pipelineBindInfo = &pipelineBindInfo,
-		.buffer = buffers.map.shadedDrawInfo,
-		.drawCount = lunaGetBufferSize(buffers.map.shadedDrawInfo) / sizeof(VkDrawIndexedIndirectCommand),
-	};
-	VulkanTestReturnResult(lunaDrawIndexedIndirect(&shadedMapDrawInfo), "Failed to draw shaded map!");
-
-	lunaBindVertexBuffers((LunaBuffer[]){buffers.map.perUnshadedMaterial}, 1, 1);
-	const LunaDrawIndexedIndirectInfo unshadedMapDrawInfo = {
-		.pipeline = pipelines.unshadedMap,
-		.pipelineBindInfo = &pipelineBindInfo,
-		.buffer = buffers.map.unshadedDrawInfo,
-		.drawCount = lunaGetBufferSize(buffers.map.unshadedDrawInfo) / sizeof(VkDrawIndexedIndirectCommand),
-	};
-	VulkanTestReturnResult(lunaDrawIndexedIndirect(&unshadedMapDrawInfo), "Failed to draw unshaded map!");
-
-
-	lunaBindVertexBuffers((LunaBuffer[]){buffers.viewmodel.vertices, buffers.viewmodel.perShadedMaterial}, 0, 2);
-	lunaBindIndexBuffer(buffers.viewmodel.indices, VK_INDEX_TYPE_UINT32);
-	const LunaDrawIndexedIndirectInfo shadedViewmodelDrawInfo = {
-		.pipeline = pipelines.shadedViewmodel,
-		.pipelineBindInfo = &pipelineBindInfo,
-		.buffer = buffers.viewmodel.shadedDrawInfo,
-		.drawCount = lunaGetBufferSize(buffers.viewmodel.shadedDrawInfo) / sizeof(VkDrawIndexedIndirectCommand),
-	};
-	VulkanTestReturnResult(lunaDrawIndexedIndirect(&shadedViewmodelDrawInfo), "Failed to draw shaded viewmodel!");
-
-	// lunaBindVertexBuffers((LunaBuffer[]){buffers.viewmodel.perUnshadedMaterial}, 1, 1);
-	// const LunaDrawIndexedIndirectInfo unshadedViewmodelDrawInfo = {
-	// 	.pipeline = pipelines.unshadedViewmodel,
-	// 	.pipelineBindInfo = &pipelineBindInfo,
-	// 	.buffer = buffers.viewmodel.unshadedDrawInfo,
-	// 	.drawCount = lunaGetBufferSize(buffers.viewmodel.unshadedDrawInfo) / sizeof(VkDrawIndexedIndirectCommand),
-	// };
-	// VulkanTestReturnResult(lunaDrawIndexedIndirect(&unshadedViewmodelDrawInfo), "Failed to draw unshaded viewmodel!");
+	VulkanTestReturnResult(DrawSky(&pipelineBindInfo), "Failed to draw sky!");
+	VulkanTestReturnResult(DrawMap(&pipelineBindInfo), "Failed to draw map!");
+	VulkanTestReturnResult(DrawViewmodel(&pipelineBindInfo), "Failed to draw viewmodel!");
 
 	return VK_SUCCESS;
 }

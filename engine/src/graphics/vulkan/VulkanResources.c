@@ -80,42 +80,32 @@ VkResult CreateUniformBuffers()
 
 VkResult CreateMapBuffers()
 {
-	static const uint32_t MAP_MAX_TRIANGLES_INIT = 512;
-	static const uint32_t MAP_MAX_SHADED_MATERIALS_INIT = 16;
-	static const uint32_t MAP_MAX_UNSHADED_MATERIALS_INIT = 8;
-
 	const LunaBufferCreationInfo verticesBufferCreationInfo = {
-		.size = sizeof(MapVertex) * 3 * MAP_MAX_TRIANGLES_INIT,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&verticesBufferCreationInfo, &buffers.map.vertices),
 						   "Failed to create shaded map vertex buffer!");
 	const LunaBufferCreationInfo indicesBufferCreationInfo = {
-		.size = sizeof(uint32_t) * 3 * MAP_MAX_TRIANGLES_INIT,
 		.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&indicesBufferCreationInfo, &buffers.map.indices),
 						   "Failed to create shaded map index buffer!");
 	const LunaBufferCreationInfo perShadedMaterialBufferCreationInfo = {
-		.size = sizeof(uint32_t) * MAP_MAX_SHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&perShadedMaterialBufferCreationInfo, &buffers.map.perShadedMaterial),
 						   "Failed to create shaded map per-material data buffer!");
 	const LunaBufferCreationInfo perUnshadedMaterialBufferCreationInfo = {
-		.size = sizeof(uint32_t) * MAP_MAX_UNSHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&perUnshadedMaterialBufferCreationInfo, &buffers.map.perUnshadedMaterial),
 						   "Failed to create unshaded map per-material data buffer!");
 	const LunaBufferCreationInfo shadedDrawInfoBufferCreationInfo = {
-		.size = sizeof(VkDrawIndexedIndirectCommand) * MAP_MAX_SHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&shadedDrawInfoBufferCreationInfo, &buffers.map.shadedDrawInfo),
 						   "Failed to create shaded map draw info buffer!");
 	const LunaBufferCreationInfo unshadedDrawInfoBufferCreationInfo = {
-		.size = sizeof(VkDrawIndexedIndirectCommand) * MAP_MAX_UNSHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&unshadedDrawInfoBufferCreationInfo, &buffers.map.unshadedDrawInfo),
@@ -147,50 +137,37 @@ VkResult CreateSkyBuffers()
 
 VkResult CreateViewmodelBuffers()
 {
-	// TODO: Init sizes are directly based on eraser
-	static const size_t VIEWMODEL_MAX_VERTICES_INIT = 220;
-	static const size_t VIEWMODEL_MAX_INDICES_INIT = 900;
-	static const size_t VIEWMODEL_MAX_SHADED_MATERIALS_INIT = 1;
-	// static const size_t VIEWMODEL_MAX_UNSHADED_MATERIALS_INIT = 0;
-
 	const LunaBufferCreationInfo verticesBufferCreationInfo = {
-		.size = sizeof(ModelVertex) * VIEWMODEL_MAX_VERTICES_INIT,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&verticesBufferCreationInfo, &buffers.viewmodel.vertices),
 						   "Failed to create shaded viewmodel vertex buffer!");
 	const LunaBufferCreationInfo indicesBufferCreationInfo = {
-		.size = sizeof(uint32_t) * VIEWMODEL_MAX_INDICES_INIT,
 		.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&indicesBufferCreationInfo, &buffers.viewmodel.indices),
 						   "Failed to create shaded viewmodel index buffer!");
 	const LunaBufferCreationInfo perShadedMaterialBufferCreationInfo = {
-		.size = sizeof(ModelInstanceData) * VIEWMODEL_MAX_SHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&perShadedMaterialBufferCreationInfo, &buffers.viewmodel.perShadedMaterial),
 						   "Failed to create shaded viewmodel per-material data buffer!");
 	const LunaBufferCreationInfo shadedDrawInfoBufferCreationInfo = {
-		.size = sizeof(VkDrawIndexedIndirectCommand) * VIEWMODEL_MAX_SHADED_MATERIALS_INIT,
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&shadedDrawInfoBufferCreationInfo, &buffers.viewmodel.shadedDrawInfo),
 						   "Failed to create shaded viewmodel draw info buffer!");
-	// TODO: Once Luna supports it, these buffers should be created with zero size
-	// const LunaBufferCreationInfo perUnshadedMaterialBufferCreationInfo = {
-	// 	.size = sizeof(ModelInstanceData) * VIEWMODEL_MAX_UNSHADED_MATERIALS_INIT,
-	// 	.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	// };
-	// VulkanTestReturnResult(lunaCreateBuffer(&perUnshadedMaterialBufferCreationInfo,
-	// 										&buffers.viewmodel.perUnshadedMaterial),
-	// 					   "Failed to create unshaded viewmodel per-material data buffer!");
-	// const LunaBufferCreationInfo unshadedDrawInfoBufferCreationInfo = {
-	// 	.size = sizeof(VkDrawIndexedIndirectCommand) * VIEWMODEL_MAX_UNSHADED_MATERIALS_INIT,
-	// 	.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-	// };
-	// VulkanTestReturnResult(lunaCreateBuffer(&unshadedDrawInfoBufferCreationInfo, &buffers.viewmodel.unshadedDrawInfo),
-	// 					   "Failed to create unshaded viewmodel draw info buffer!");
+	const LunaBufferCreationInfo perUnshadedMaterialBufferCreationInfo = {
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&perUnshadedMaterialBufferCreationInfo,
+											&buffers.viewmodel.perUnshadedMaterial),
+						   "Failed to create unshaded viewmodel per-material data buffer!");
+	const LunaBufferCreationInfo unshadedDrawInfoBufferCreationInfo = {
+		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+	};
+	VulkanTestReturnResult(lunaCreateBuffer(&unshadedDrawInfoBufferCreationInfo, &buffers.viewmodel.unshadedDrawInfo),
+						   "Failed to create unshaded viewmodel draw info buffer!");
 
 	return VK_SUCCESS;
 }
