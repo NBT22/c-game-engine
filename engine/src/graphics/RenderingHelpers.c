@@ -128,7 +128,7 @@ bool RenderPreInit()
 	switch (currentRenderer)
 	{
 		case RENDERER_VULKAN:
-			return true;
+			return VK_PreInit();
 		case RENDERER_OPENGL:
 			return GL_PreInit();
 		default:

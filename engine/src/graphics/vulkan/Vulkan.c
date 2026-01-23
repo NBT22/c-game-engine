@@ -321,11 +321,24 @@ static inline VkResult LoadMap(const Map *map)
 	return VK_SUCCESS;
 }
 
+bool VK_PreInit()
+{
+	LogDebug("Creating Vulkan instance...\n");
+	if (!CreateInstance())
+	{
+		VK_Cleanup();
+
+		return false;
+	}
+
+	return true;
+}
+
 bool VK_Init(SDL_Window *window)
 {
 	LogDebug("Initializing Vulkan renderer...\n");
 	// clang-format off
-	if (CreateInstance(window) && CreateSurface() && CreateLogicalDevice() && CreateSwapchain() && CreateRenderPass() &&
+	if (CreateSurface(window) && CreateLogicalDevice() && CreateSwapchain() && CreateRenderPass() &&
 		CreateDescriptorSetLayouts() && CreateGraphicsPipelines() && CreateTextureSamplers() && CreateBuffers() &&
 		CreateDescriptorSet())
 	{
@@ -380,10 +393,7 @@ bool VK_Init(SDL_Window *window)
 		return true;
 	}
 
-	if (!VK_Cleanup())
-	{
-		VulkanLogError("Cleanup failed!");
-	}
+	VK_Cleanup();
 
 	return false;
 }
@@ -646,14 +656,12 @@ VkResult VK_FrameEnd()
 	return VK_SUCCESS;
 }
 
-bool VK_Cleanup()
+void VK_Cleanup()
 {
 	LogDebug("Cleaning up Vulkan renderer...\n");
-	VulkanTest(lunaDestroyInstance(), "Cleanup failed!");
 	free(buffers.ui.vertexData);
 	free(buffers.ui.indexData);
-
-	return true;
+	VulkanTestInternal(lunaDestroyInstance(), (void)0, "Cleanup failed!");
 }
 
 inline void VK_Minimize()

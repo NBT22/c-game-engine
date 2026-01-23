@@ -32,13 +32,10 @@ static SDL_Window *vulkanWindow;
 static VkSurfaceKHR surface;
 static VkPhysicalDeviceProperties physicalDeviceProperties;
 
-bool CreateInstance(SDL_Window *window)
+bool CreateInstance()
 {
-	vulkanWindow = window;
-
 	uint32_t extensionCount = 0;
-	// const char *extensionNames[extensionCount];
-	char const * const *extensionNames = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+	const char *const *extensionNames = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
 	if (!extensionNames)
 	{
 		VulkanLogError("Failed to acquire extensions required for SDL window!\n");
@@ -60,9 +57,11 @@ bool CreateInstance(SDL_Window *window)
 	return true;
 }
 
-bool CreateSurface()
+bool CreateSurface(SDL_Window *window)
 {
-	if (!SDL_Vulkan_CreateSurface(vulkanWindow, lunaGetInstance(), NULL, &surface)) // TODO should argument 3 be something
+	vulkanWindow = window;
+
+	if (!SDL_Vulkan_CreateSurface(vulkanWindow, lunaGetInstance(), NULL, &surface))
 	{
 		VulkanLogError("Failed to create window surface\n");
 		return false;

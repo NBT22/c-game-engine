@@ -32,14 +32,8 @@
 #define VK_X_TO_NDC(x) ((float)(x) / ScaledWindowWidthFloat() * 2.0f - 1.0f)
 #define VK_Y_TO_NDC(y) ((float)(y) / ScaledWindowHeightFloat() * 2.0f - 1.0f)
 
-/**
- * This function is used to create the Vulkan instance and surface, as well as configuring the environment properly.
- * This function (and the functions it calls) do NOT perform any drawing, though the framebuffers are initialized here.
- * @param window The window to initialize Vulkan for.
- * @see CreateInstance
- * @see PickPhysicalDevice
- * @see CreateLogicalDevice
- */
+bool VK_PreInit();
+
 bool VK_Init(SDL_Window *window);
 
 bool VK_UpdateActors(const LockingList *actors, bool shouldReloadActors);
@@ -59,7 +53,7 @@ VkResult VK_RenderMap(const Map *map, const Camera *camera);
 VkResult VK_FrameEnd();
 
 /// A function used to destroy the Vulkan objects when they are no longer needed.
-bool VK_Cleanup();
+void VK_Cleanup();
 
 void VK_Minimize();
 
