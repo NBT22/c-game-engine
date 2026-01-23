@@ -46,14 +46,17 @@ bool GL_PreInit()
 				mssaValue = 8;
 				break;
 			default:
-				GL_Error("Invalid MSAA value!");
+				LogError("OpenGL: Invalid MSAA value!");
 				return false;
 		}
-		if (SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mssaValue) != 0)
-		{
-			LogError("Failed to set MSAA samples attribute: %s\n", SDL_GetError());
-		}
+		glMsaaSamples = mssaValue;
 	}
+	TestSDLFunction(SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0),
+					"Failed to set OpenGL MSAA buffers",
+					GL_INIT_FAIL_MSG);
+	TestSDLFunction(SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0),
+					"Failed to set OpenGL MSAA samples",
+					GL_INIT_FAIL_MSG);
 	TestSDLFunction(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, GL_VERSION_MAJOR),
 					"Failed to set OpenGL major version",
 					GL_INIT_FAIL_MSG);
@@ -82,7 +85,6 @@ bool GL_Init(SDL_Window *wnd)
 	if (ctx == NULL)
 	{
 		LogError("SDL_GL_CreateContext Error: %s\n", SDL_GetError());
-		GL_Error("Failed to create OpenGL context");
 		return false;
 	}
 
@@ -96,7 +98,6 @@ bool GL_Init(SDL_Window *wnd)
 	{
 		SDL_GL_DeleteContext(ctx);
 		LogError("glewInit Failed with error %d\n", err);
-		GL_Error(GL_INIT_FAIL_MSG);
 		return false;
 	}
 
@@ -104,7 +105,13 @@ bool GL_Init(SDL_Window *wnd)
 	if (!GL_VERSION_CHECK)
 	{
 		SDL_GL_DeleteContext(ctx);
-		GL_Error(GL_INIT_FAIL_MSG);
+		LogError("OpenGL: GL_VERSION_CHECK failed\n");
+		return false;
+	}
+
+	if (!GLEW_ARB_framebuffer_object)
+	{
+		LogError("OpenGL device does not support GLEW_ARB_framebuffer_object!\n");
 		return false;
 	}
 
@@ -126,7 +133,7 @@ bool GL_Init(SDL_Window *wnd)
 				requestedAnisotropy = 16;
 				break;
 			default:
-				GL_Error("Invalid anisotropy level!");
+				LogError("OpenGL: Invalid anisotropy level!");
 				return false;
 		}
 		GLfloat gpuMaxAnisotropy = 0;
@@ -154,7 +161,10 @@ bool GL_Init(SDL_Window *wnd)
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(GL_DebugMessageCallback, NULL);
 
-	int redSize, greenSize, blueSize, alphaSize;
+	int redSize = 0;
+	int greenSize = 0;
+	int blueSize = 0;
+	int alphaSize = 0;
 	SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redSize);
 	SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenSize);
 	SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueSize);

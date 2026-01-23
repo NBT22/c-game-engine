@@ -9,6 +9,8 @@
 #include <engine/physics/Physics.h>
 #include <engine/structs/Camera.h>
 #include <engine/structs/GlobalState.h>
+#include <engine/structs/Item.h>
+#include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Options.h>
 #include <engine/subsystem/Discord.h>
@@ -44,6 +46,7 @@ void InitState()
 	CheckAlloc(state.camera);
 	state.camera->fov = GetState()->options.fov;
 	state.rpcState = IN_MENUS;
+	ListInit(state.saveData->items, LIST_POINTER);
 }
 
 inline GlobalState *GetState()
@@ -51,21 +54,78 @@ inline GlobalState *GetState()
 	return &state;
 }
 
-void TakeDamage(const int damage)
+Item *GetItem()
 {
-	state.saveData->hp -= damage;
-	if (state.saveData->hp < 0)
+	if (state.saveData->items.length != 0 && state.saveData->currentItem < state.saveData->items.length)
 	{
-		state.saveData->hp = 0;
+		return ListGetPointer(state.saveData->items, state.saveData->currentItem);
+	}
+	return NULL;
+}
+
+void GiveItem(const ItemDefinition *definition, const bool switchToItem)
+{
+	for (size_t i = 0; i < state.saveData->items.length; i++)
+	{
+		const Item *item = ListGetPointer(state.saveData->items, i);
+		if (item->definition == definition)
+		{
+			if (switchToItem)
+			{
+				SwitchToItem(definition);
+			}
+			break;
+		}
+	}
+	Item *item = malloc(sizeof(Item));
+	CheckAlloc(item);
+	item->definition = definition;
+	definition->Construct(item);
+	ListAdd(state.saveData->items, item);
+	if (switchToItem)
+	{
+		SwitchToItem(definition);
 	}
 }
 
-void Heal(const int amount)
+void SwitchToItem(const ItemDefinition *definition)
 {
-	state.saveData->hp += amount;
-	if (state.saveData->hp > MAX_HEALTH)
+	for (size_t i = 0; i < state.saveData->items.length; i++)
 	{
-		state.saveData->hp = MAX_HEALTH;
+		Item *item = ListGetPointer(state.saveData->items, i);
+		if (item->definition == definition)
+		{
+			Item *previousItem = GetItem();
+			if (previousItem)
+			{
+				previousItem->definition->SwitchFrom(previousItem, &state.map->viewmodel);
+			}
+			state.saveData->currentItem = i;
+			if (state.map)
+			{
+				definition->SwitchTo(item, &state.map->viewmodel);
+			}
+			return;
+		}
+	}
+	LogWarning("Was instructed to switch to an item that the player does not have!\n");
+}
+
+void NextItem()
+{
+	if (state.saveData->currentItem < state.saveData->items.length - 1)
+	{
+		const Item *next = ListGetPointer(state.saveData->items, state.saveData->currentItem + 1);
+		SwitchToItem(next->definition);
+	}
+}
+
+void PreviousItem()
+{
+	if (state.saveData->currentItem > 0)
+	{
+		const Item *next = ListGetPointer(state.saveData->items, state.saveData->currentItem - 1);
+		SwitchToItem(next->definition);
 	}
 }
 

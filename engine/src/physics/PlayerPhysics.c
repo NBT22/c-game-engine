@@ -9,6 +9,7 @@
 #include <engine/structs/Actor.h>
 #include <engine/structs/Color.h>
 #include <engine/structs/GlobalState.h>
+#include <engine/structs/Item.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Player.h>
 #include <engine/subsystem/Input.h>
@@ -304,7 +305,7 @@ void UpdatePlayer(Player *player, const JPH_PhysicsSystem *physicsSystem, const 
 		{
 			player->heldActor = NULL;
 			player->hasHeldActor = false;
-			crosshairColor = COLOR(0xFFFFCCCC);
+			crosshairColor = CROSSHAIR_COLOR_NORMAL;
 		} else
 		{
 			Vector3 heldActorPosition;
@@ -317,7 +318,7 @@ void UpdatePlayer(Player *player, const JPH_PhysicsSystem *physicsSystem, const 
 			{
 				player->heldActor = NULL;
 				player->hasHeldActor = false;
-				crosshairColor = COLOR(0xFFFFCCCC);
+				crosshairColor = CROSSHAIR_COLOR_NORMAL;
 			} else
 			{
 				Vector3 forward;
@@ -354,32 +355,53 @@ void UpdatePlayer(Player *player, const JPH_PhysicsSystem *physicsSystem, const 
 		player->targetedActor = GetTargetedActor(JPH_PhysicsSystem_GetBodyInterface(physicsSystem), &raycastResult);
 		if (player->targetedActor)
 		{
-			if ((player->targetedActor->actorFlags & ACTOR_FLAG_ENEMY) == ACTOR_FLAG_ENEMY)
+			Item *item = GetItem();
+			bool itemTarget = false;
+			if (item)
 			{
-				crosshairColor = COLOR(0xFFFF0000);
-				if (IsMouseButtonJustPressedPhys(SDL_BUTTON_LEFT) || IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_X))
+				itemTarget = item->definition->CanTarget(item, player->targetedActor, &crosshairColor);
+				if (itemTarget)
 				{
-					RemoveActor(player->targetedActor);
-					player->targetedActor = NULL;
-					crosshairColor = COLOR(0xFFFFCCCC);
+					if (IsMouseButtonJustPressedPhys(SDL_BUTTON_LEFT) ||
+						IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_X))
+					{
+						item->definition->PrimaryActionDown(item);
+					} else if (IsMouseButtonJustReleasedPhys(SDL_BUTTON_LEFT) ||
+							   IsButtonJustReleasedPhys(SDL_CONTROLLER_BUTTON_X))
+					{
+						item->definition->PrimaryActionUp(item);
+					} else if (IsMouseButtonJustPressedPhys(SDL_BUTTON_RIGHT) ||
+							   IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_Y))
+					{
+						item->definition->SecondaryActionDown(item);
+					} else if (IsMouseButtonJustReleasedPhys(SDL_BUTTON_RIGHT) ||
+							   IsButtonJustReleasedPhys(SDL_CONTROLLER_BUTTON_Y))
+					{
+
+					}
 				}
-			} else if (((player->targetedActor->actorFlags & ACTOR_FLAG_CAN_BE_HELD) == ACTOR_FLAG_CAN_BE_HELD) &&
-					   (raycastResult.fraction * actorRaycastMaxDistance < 1.0f))
+			}
+
+			if (player->targetedActor && !itemTarget) // condition is NOT always true it is LYING to you
 			{
-				crosshairColor = COLOR(0xFF006600);
-				if (IsKeyJustPressedPhys(SDL_SCANCODE_E) || IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_A))
+				if (((player->targetedActor->actorFlags & ACTOR_FLAG_CAN_BE_HELD) == ACTOR_FLAG_CAN_BE_HELD) &&
+					(raycastResult.fraction * actorRaycastMaxDistance < 1.0f))
 				{
-					player->heldActor = player->targetedActor;
-					player->hasHeldActor = true;
-					crosshairColor = COLOR(0x00FF0000);
+					crosshairColor = CROSSHAIR_COLOR_HOLDABLE;
+					if (IsKeyJustPressedPhys(SDL_SCANCODE_E) || IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_A))
+					{
+						player->heldActor = player->targetedActor;
+						player->hasHeldActor = true;
+						crosshairColor = CROSSHAIR_COLOR_INVISIBLE;
+					}
+				} else
+				{
+					crosshairColor = CROSSHAIR_COLOR_NORMAL;
 				}
-			} else
-			{
-				crosshairColor = COLOR(0xFFFFCCCC);
 			}
 		} else
 		{
-			crosshairColor = COLOR(0xFFFFCCCC);
+			crosshairColor = CROSSHAIR_COLOR_NORMAL;
 		}
 	}
 	if (IsKeyJustReleasedPhys(SDL_SCANCODE_V))
