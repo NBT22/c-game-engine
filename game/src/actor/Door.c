@@ -103,7 +103,7 @@ static inline void DoorSetState(const Actor *this, const DoorState state, const 
 
 static inline void CreateDoorCollider(Actor *this, const Transform *transform)
 {
-	JPH_Shape *shape = ActorWallCreateCollider();
+	JPH_Shape *shape = ActorWallCreateCollider(this->actorWall);
 	JPH_BodyCreationSettings *bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(shape,
 																						   transform,
 																						   JPH_MotionType_Kinematic,
@@ -320,8 +320,6 @@ void DoorInit(Actor *this, const KvList params, Transform *transform)
 	DoorData *data = this->extraData;
 	data->stayOpen = KvGetBool(params, "stayOpen", false);
 
-	CreateDoorBodies(this, transform, KvGetBool(params, "preventPlayerOpen", false));
-
 	this->actorWall = malloc(sizeof(ActorWall));
 	CheckAlloc(this->actorWall);
 	this->actorWall->a = v2(0, -0.5f);
@@ -333,21 +331,24 @@ void DoorInit(Actor *this, const KvList params, Transform *transform)
 	this->actorWall->height = 1.0f;
 	this->actorWall->unshaded = false;
 	ActorWallBake(this);
+
+	CreateDoorBodies(this, transform, KvGetBool(params, "preventPlayerOpen", false));
 }
 
-static ActorDefinition definition = {.actorType = ACTOR_TYPE_DOOR,
-									 .Update = DoorUpdate,
-									 .OnPlayerContactAdded = DoorOnPlayerContactAdded,
-									 .OnPlayerContactPersisted = DoorOnPlayerContactPersisted,
-									 .OnPlayerContactRemoved = DoorOnPlayerContactRemoved,
-									 .RenderUi = DefaultActorRenderUi,
-									 .Destroy = DoorDestroy,
-									 .Init = DoorInit};
+ActorDefinition doorActorDefinition = {
+	.Update = DoorUpdate,
+	.OnPlayerContactAdded = DoorOnPlayerContactAdded,
+	.OnPlayerContactPersisted = DoorOnPlayerContactPersisted,
+	.OnPlayerContactRemoved = DoorOnPlayerContactRemoved,
+	.RenderUi = DefaultActorRenderUi,
+	.Destroy = DoorDestroy,
+	.Init = DoorInit,
+};
 
 void RegisterDoor()
 {
-	RegisterDefaultActorInputs(&definition);
-	RegisterActorInput(&definition, DOOR_INPUT_OPEN, DoorOpenHandler);
-	RegisterActorInput(&definition, DOOR_INPUT_CLOSE, DoorCloseHandler);
-	RegisterActor(DOOR_ACTOR_NAME, &definition);
+	RegisterDefaultActorInputs(&doorActorDefinition);
+	RegisterActorInput(&doorActorDefinition, DOOR_INPUT_OPEN, DoorOpenHandler);
+	RegisterActorInput(&doorActorDefinition, DOOR_INPUT_CLOSE, DoorCloseHandler);
+	RegisterActor(DOOR_ACTOR_NAME, &doorActorDefinition);
 }

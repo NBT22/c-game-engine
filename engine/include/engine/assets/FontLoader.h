@@ -46,6 +46,9 @@ struct Font
 	float charEndUVs[255];
 };
 
+/**
+ * Generate a generic fallback font
+ */
 Font *GenerateFallbackFont();
 
 /**

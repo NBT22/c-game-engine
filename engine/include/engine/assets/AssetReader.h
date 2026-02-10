@@ -6,11 +6,13 @@
 #define GAME_ASSETREADER_H
 
 #include <engine/structs/Asset.h>
+#include <engine/subsystem/Logging.h>
 #include <stdbool.h>
 #include <stddef.h>
 
 #define ASSET_FORMAT_VERSION 2
 #define ASSET_FORMAT_MAGIC 0x454D4147
+#define ASSET_HEADER_SIZE (sizeof(uint32_t) + (sizeof(uint8_t) * 3) + (sizeof(size_t) * 2))
 
 /**
  * Prints an error and returns NULL if there are not enough bytes remaining to read
@@ -27,6 +29,11 @@
 		} \
 		(bytesRemaining) -= (expected); \
 	}
+
+/**
+ * Set the base path that assets will be loaded from
+ */
+void SetAssetsPath(const char *newPath);
 
 /**
  * Initialize the asset cache
