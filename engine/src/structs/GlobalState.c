@@ -46,7 +46,7 @@ void InitState()
 	CheckAlloc(state.camera);
 	state.camera->fov = GetState()->options.fov;
 	state.rpcState = IN_MENUS;
-	ListInit(state.saveData->items, LIST_POINTER);
+	ListInit(state.saveData->items, Item);
 }
 
 inline GlobalState *GetState()
@@ -58,7 +58,8 @@ Item *GetItem()
 {
 	if (state.saveData->items.length != 0 && state.saveData->currentItem < state.saveData->items.length)
 	{
-		return ListGetPointer(state.saveData->items, state.saveData->currentItem);
+		const Item asd = ListGet(state.saveData->items, state.saveData->currentItem, Item);
+		return &ListGet(state.saveData->items, state.saveData->currentItem, Item);
 	}
 	return NULL;
 }
@@ -67,8 +68,7 @@ void GiveItem(const ItemDefinition *definition, const bool switchToItem)
 {
 	for (size_t i = 0; i < state.saveData->items.length; i++)
 	{
-		const Item *item = ListGetPointer(state.saveData->items, i);
-		if (item->definition == definition)
+		if (ListGet(state.saveData->items, i, Item).definition == definition)
 		{
 			if (switchToItem)
 			{
@@ -77,10 +77,10 @@ void GiveItem(const ItemDefinition *definition, const bool switchToItem)
 			break;
 		}
 	}
-	Item *item = malloc(sizeof(Item));
-	CheckAlloc(item);
-	item->definition = definition;
-	definition->Construct(item);
+	Item item = {
+		.definition = definition,
+	};
+	definition->Construct(&item);
 	ListAdd(state.saveData->items, item);
 	if (switchToItem)
 	{
@@ -92,7 +92,7 @@ void SwitchToItem(const ItemDefinition *definition)
 {
 	for (size_t i = 0; i < state.saveData->items.length; i++)
 	{
-		Item *item = ListGetPointer(state.saveData->items, i);
+		Item *item = &ListGet(state.saveData->items, i, Item);
 		if (item->definition == definition)
 		{
 			Item *previousItem = GetItem();
@@ -115,8 +115,7 @@ void NextItem()
 {
 	if (state.saveData->currentItem < state.saveData->items.length - 1)
 	{
-		const Item *next = ListGetPointer(state.saveData->items, state.saveData->currentItem + 1);
-		SwitchToItem(next->definition);
+		SwitchToItem(ListGet(state.saveData->items, state.saveData->currentItem + 1, Item).definition);
 	}
 }
 
@@ -124,8 +123,7 @@ void PreviousItem()
 {
 	if (state.saveData->currentItem > 0)
 	{
-		const Item *next = ListGetPointer(state.saveData->items, state.saveData->currentItem - 1);
-		SwitchToItem(next->definition);
+		SwitchToItem(ListGet(state.saveData->items, state.saveData->currentItem - 1, Item).definition);
 	}
 }
 

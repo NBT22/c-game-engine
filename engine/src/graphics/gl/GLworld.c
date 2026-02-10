@@ -286,7 +286,7 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 	ListLock(map->actors);
 	for (size_t i = 0; i < map->actors.length; i++)
 	{
-		const Actor *actor = ListGetPointer(map->actors, i);
+		const Actor *actor = ListGet(map->actors, i, const Actor *);
 		if (!actor->actorWall && !actor->actorModel)
 		{
 			continue;

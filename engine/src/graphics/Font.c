@@ -213,7 +213,12 @@ void DrawTextAligned(const char *str,
 			const float charUVStart = font->charStartUVs[(int)line[j]];
 			const float charUVEnd = font->charEndUVs[(int)line[j]];
 
-			float *vert = verts + (c + j) * 16;
+			const size_t charIndex = c + j;
+			const size_t vertexOffset = charIndex * 4;
+			const size_t indexOffset = charIndex * 6;
+
+			// *vert++ is used for optimization reasons (thanks compiler...)
+			float *vert = verts + vertexOffset * 4;
 			*vert++ = ndcPos.x;
 			*vert++ = ndcPos.y;
 			*vert++ = charUVStart;
@@ -231,15 +236,15 @@ void DrawTextAligned(const char *str,
 			*vert++ = charUVEnd;
 			*vert = 0;
 
-			indices[(c + j) * 6 + 0] = 0;
-			indices[(c + j) * 6 + 1] = 1;
-			indices[(c + j) * 6 + 2] = 2;
-			indices[(c + j) * 6 + 3] = 0;
-			indices[(c + j) * 6 + 4] = 2;
-			indices[(c + j) * 6 + 5] = 3;
+			indices[indexOffset + 0] = 0;
+			indices[indexOffset + 1] = 1;
+			indices[indexOffset + 2] = 2;
+			indices[indexOffset + 3] = 0;
+			indices[indexOffset + 4] = 2;
+			indices[indexOffset + 5] = 3;
 			for (int k = 0; k < 6; k++)
 			{
-				indices[(c + j) * 6 + k] += (c + j) * 4;
+				indices[indexOffset + k] += vertexOffset;
 			}
 
 			lx += fSize;

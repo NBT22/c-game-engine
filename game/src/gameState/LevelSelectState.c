@@ -53,7 +53,7 @@ void LevelSelectStateUpdate(GlobalState * /*state*/)
 	{
 		ConsumeKey(SDL_SCANCODE_SPACE);
 		ConsumeButton(CONTROLLER_OK);
-		LoadingStateSet(ListGetPointer(levelList, selectedLevel));
+		LoadingStateSet(ListGet(levelList, selectedLevel, const char *));
 	}
 }
 
@@ -68,9 +68,7 @@ void LevelSelectStateRender(GlobalState * /*state*/)
 
 	if (levelList.length > 0)
 	{
-		char *levelName = ListGetPointer(levelList, selectedLevel);
-
-		snprintf(levelNameBuffer, 128, "%s", levelName);
+		snprintf(levelNameBuffer, 128, "%s", ListGet(levelList, selectedLevel, const char *));
 	} else
 	{
 		strcpy((char *)&levelNameBuffer, "No levels found");
@@ -88,7 +86,7 @@ void LevelSelectStateRender(GlobalState * /*state*/)
 
 void LoadLevelList()
 {
-	ListInit(levelList, LIST_POINTER);
+	ListInit(levelList, const char *);
 	char levelDataPath[300];
 	sprintf(levelDataPath, "%sassets/map/", GetState()->executableFolder);
 

@@ -26,7 +26,7 @@
 
 VkResult CreateUiBuffers()
 {
-	static const uint32_t MAX_UI_QUADS_INIT = 8192; // TODO: Ensure this is a good value for GGUI
+	static const uint32_t MAX_UI_QUADS_INIT = 2 << 20; // TODO: Ensure this is a good value for GGUI
 
 	buffers.ui.allocatedQuads = 0;
 	buffers.ui.freeQuads = MAX_UI_QUADS_INIT;
@@ -90,16 +90,11 @@ VkResult CreateMapBuffers()
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&indicesBufferCreationInfo, &buffers.map.indices),
 						   "Failed to create shaded map index buffer!");
-	const LunaBufferCreationInfo perShadedMaterialBufferCreationInfo = {
+	const LunaBufferCreationInfo instanceDataBufferCreationInfo = {
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
-	VulkanTestReturnResult(lunaCreateBuffer(&perShadedMaterialBufferCreationInfo, &buffers.map.perShadedMaterial),
-						   "Failed to create shaded map per-material data buffer!");
-	const LunaBufferCreationInfo perUnshadedMaterialBufferCreationInfo = {
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&perUnshadedMaterialBufferCreationInfo, &buffers.map.perUnshadedMaterial),
-						   "Failed to create unshaded map per-material data buffer!");
+	VulkanTestReturnResult(lunaCreateBuffer(&instanceDataBufferCreationInfo, &buffers.map.instanceData),
+						   "Failed to create shaded map instance data buffer!");
 	const LunaBufferCreationInfo shadedDrawInfoBufferCreationInfo = {
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
@@ -147,22 +142,16 @@ VkResult CreateViewmodelBuffers()
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&indicesBufferCreationInfo, &buffers.viewmodel.indices),
 						   "Failed to create shaded viewmodel index buffer!");
-	const LunaBufferCreationInfo perShadedMaterialBufferCreationInfo = {
+	const LunaBufferCreationInfo instanceDataBufferCreationInfo = {
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 	};
-	VulkanTestReturnResult(lunaCreateBuffer(&perShadedMaterialBufferCreationInfo, &buffers.viewmodel.perShadedMaterial),
-						   "Failed to create shaded viewmodel per-material data buffer!");
+	VulkanTestReturnResult(lunaCreateBuffer(&instanceDataBufferCreationInfo, &buffers.viewmodel.instanceData),
+						   "Failed to create shaded viewmodel instance data buffer!");
 	const LunaBufferCreationInfo shadedDrawInfoBufferCreationInfo = {
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
 	VulkanTestReturnResult(lunaCreateBuffer(&shadedDrawInfoBufferCreationInfo, &buffers.viewmodel.shadedDrawInfo),
 						   "Failed to create shaded viewmodel draw info buffer!");
-	const LunaBufferCreationInfo perUnshadedMaterialBufferCreationInfo = {
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	};
-	VulkanTestReturnResult(lunaCreateBuffer(&perUnshadedMaterialBufferCreationInfo,
-											&buffers.viewmodel.perUnshadedMaterial),
-						   "Failed to create unshaded viewmodel per-material data buffer!");
 	const LunaBufferCreationInfo unshadedDrawInfoBufferCreationInfo = {
 		.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	};
@@ -269,7 +258,7 @@ bool LoadTexture(const Image *image)
 	const size_t index = textures.length;
 	VulkanTest(lunaCreateImage(&imageCreationInfo, &lunaImage), "Failed to create texture!");
 	imageAssetIdToIndexMap[image->id] = index;
-	ListInsertAfter(textures, index - 1, lunaImage);
+	ListAdd(textures, lunaImage);
 
 	const LunaDescriptorImageInfo imageInfo = {
 		.image = lunaImage,

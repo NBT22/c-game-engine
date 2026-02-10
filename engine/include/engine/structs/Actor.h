@@ -12,6 +12,7 @@
 #include <engine/structs/KVList.h>
 #include <engine/structs/List.h>
 #include <joltc/Math/Transform.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <joltc/types.h>
 #include <stdbool.h>
@@ -50,6 +51,9 @@ struct ActorConnection
 
 struct Actor
 {
+	/// A unique ID used to represent this actor
+	uint64_t id;
+
 	/// Flags used to provide more information about the actor
 	uint32_t actorFlags;
 

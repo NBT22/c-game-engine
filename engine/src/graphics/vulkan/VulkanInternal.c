@@ -422,7 +422,7 @@ bool CreateTextureSamplers()
 								 &textureSamplers.nearestNoRepeatNoAnisotropy),
 			   "Failed to create nearest non-repeating no anisotropy texture sampler!");
 
-	ListInit(textures, LIST_POINTER);
+	ListInit(textures, LunaImage);
 	memset(imageAssetIdToIndexMap, -1, sizeof(*imageAssetIdToIndexMap) * MAX_TEXTURES);
 
 	return true;

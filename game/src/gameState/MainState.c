@@ -156,8 +156,8 @@ void MainStateFixedUpdate(GlobalState *state, const double delta)
 
 	for (size_t i = 0; i < state->map->actors.length; i++)
 	{
-		Actor *a = ListGetPointer(state->map->actors, i);
-		a->definition->Update(a, delta);
+		Actor *actor = ListGet(state->map->actors, i, Actor *);
+		actor->definition->Update(actor, delta);
 	}
 
 	if (IsKeyJustPressedPhys(SDL_SCANCODE_L))

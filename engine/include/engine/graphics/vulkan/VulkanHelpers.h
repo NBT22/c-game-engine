@@ -27,6 +27,8 @@
 #define MAX_DEBUG_DRAW_VERTICES_INIT 1024
 #endif
 
+#define SizeofMember(Type, member) (sizeof(((Type *)0)->member))
+
 #define VulkanLogError(...) LogInternal("VULKAN", 31, true, __VA_ARGS__)
 // TODO Use LogInternal
 #define VulkanTestInternal(function, returnValue, ...) \
@@ -129,13 +131,15 @@ typedef struct DebugDrawVertex
 typedef struct ModelInstanceData
 {
 	mat4 transformMatrix;
+	Color materialColor;
 	uint32_t textureIndex;
 } ModelInstanceData;
 
 typedef struct ActorModelInstanceData
 {
 	mat4 transformMatrix;
-	float modColor;
+	vec4 modColor;
+	vec4 materialColor;
 	uint32_t textureIndex;
 } ActorModelInstanceData;
 
@@ -158,16 +162,14 @@ typedef struct UniformBuffers
 } UniformBuffers;
 
 /// Contains the required buffers for a model that can have multiple materials
-typedef struct ModelBuffer // TODO: Reorder for memory locality
+typedef struct ModelBuffer
 {
 	/// A buffer containing per-vertex data
 	LunaBuffer vertices;
 	/// A buffer containing the index data to use along-side the per-vertex data
 	LunaBuffer indices;
-	/// A buffer containing data that only needs to exist once per shaded material
-	LunaBuffer perShadedMaterial;
-	/// A buffer containing data that only needs to exist once per unshaded material
-	LunaBuffer perUnshadedMaterial;
+	/// A buffer containing the instance data for each actor
+	LunaBuffer instanceData;
 	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the shaded materials draw call
 	LunaBuffer shadedDrawInfo;
 	/// A buffer containing the VkDrawIndexedIndirectCommand structures required for the unshaded materials draw call
@@ -200,8 +202,9 @@ typedef struct Buffers
 {
 	UiBuffer ui;
 	UniformBuffers uniforms;
-	ModelBuffer map;
 	ModelBuffer viewmodel;
+	ModelBuffer actorModels;
+	ModelBuffer map;
 	SkyBuffer sky;
 #ifdef JPH_DEBUG_RENDERER
 	DebugDrawBuffer debugDrawLines;
@@ -217,6 +220,8 @@ typedef struct Pipelines
 	LunaGraphicsPipeline sky;
 	LunaGraphicsPipeline shadedViewmodel;
 	LunaGraphicsPipeline unshadedViewmodel;
+	LunaGraphicsPipeline shadedActorModel;
+	LunaGraphicsPipeline unshadedActorModel;
 #ifdef JPH_DEBUG_RENDERER
 	LunaGraphicsPipeline debugDrawLines;
 	LunaGraphicsPipeline debugDrawTriangles;

@@ -122,7 +122,6 @@ Asset *DecompressAsset(const char *relPath, const bool cache)
 	}
 
 	size_t offset = 0;
-	// Read the first 4 bytes of the asset to get the size of the compressed data
 	const uint32_t magic = ReadUint(assetData, &offset);
 	if (magic != ASSET_FORMAT_MAGIC)
 	{
@@ -144,7 +143,10 @@ Asset *DecompressAsset(const char *relPath, const bool cache)
 
 	if (fileSize - ASSET_HEADER_SIZE != compressedSize)
 	{
-		LogError("Asset misreported compressedSize as %zu, while the file has %zu bytes remaining. Refusing to read this asset.\n", fileSize - ASSET_HEADER_SIZE, compressedSize);
+		LogError("Asset misreported compressedSize as %zu, while the file has %zu bytes remaining. Refusing to read "
+				 "this asset.\n",
+				 compressedSize,
+				 fileSize - ASSET_HEADER_SIZE);
 		free(assetData);
 		return NULL;
 	}

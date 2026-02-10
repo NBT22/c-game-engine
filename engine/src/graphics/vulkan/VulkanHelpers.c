@@ -167,31 +167,17 @@ VkResult UpdateViewModelMatrix(const Viewmodel *viewmodel)
 	glm_mat4_mul(translationMatrix, rotationMatrix, translationMatrix);
 	glm_mat4_mul(perspectiveMatrix, translationMatrix, viewModelMatrix);
 
-	const size_t shadedMaterialCount = lunaGetBufferSize(buffers.viewmodel.perShadedMaterial) /
-									   sizeof(ModelInstanceData);
-	for (size_t i = 0; i < shadedMaterialCount; i++)
+	const size_t instanceCount = lunaGetBufferSize(buffers.viewmodel.instanceData) / sizeof(ModelInstanceData);
+	for (size_t i = 0; i < instanceCount; i++)
 	{
 		const LunaBufferWriteInfo writeInfo = {
 			.bytes = sizeof(mat4),
 			.data = viewModelMatrix,
-			.offset = i * sizeof(mat4),
+			.offset = i * sizeof(ModelInstanceData) + offsetof(ModelInstanceData, transformMatrix),
 			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 		};
-		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.viewmodel.perShadedMaterial, &writeInfo),
-							   "Failed to write viewmodel transform matrix to shaded buffer!");
-	}
-	const size_t unshadedMaterialCount = lunaGetBufferSize(buffers.viewmodel.perUnshadedMaterial) /
-										 sizeof(ModelInstanceData);
-	for (size_t i = 0; i < unshadedMaterialCount; i++)
-	{
-		const LunaBufferWriteInfo writeInfo = {
-			.bytes = sizeof(mat4),
-			.data = viewModelMatrix,
-			.offset = i * sizeof(mat4),
-			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-		};
-		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.viewmodel.perUnshadedMaterial, &writeInfo),
-							   "Failed to write viewmodel transform matrix to unshaded buffer!");
+		VulkanTestReturnResult(lunaWriteDataToBuffer(buffers.viewmodel.instanceData, &writeInfo),
+							   "Failed to write viewmodel transform matrix to instance data buffer!");
 	}
 
 	return VK_SUCCESS;
