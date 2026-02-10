@@ -22,10 +22,8 @@ void _ListInit(List *list, const enum _ListType listType)
 	assert(listType == LIST_POINTER || listType == LIST_UINT64 || listType == LIST_UINT32 || listType == LIST_INT32);
 
 	list->length = 0;
-	list->data = malloc(sizeof(struct _ListData));
-	CheckAlloc(list->data);
-	list->data->type = listType;
-	list->data->pointerData = NULL;
+	list->type = listType;
+	list->pointerData = NULL;
 }
 
 void _LockingListInit(LockingList *list, const enum _ListType listType)
@@ -36,14 +34,21 @@ void _LockingListInit(LockingList *list, const enum _ListType listType)
 	list->mutex = SDL_CreateMutex();
 }
 
+void _SortedListInit(SortedList *list,
+					 const enum _ListType listType,
+					 int (*const CompareFunction)(const void *, const void *))
+{
+	assert(list);
+
+	_ListInit((List *)list, listType);
+	list->CompareFunction = CompareFunction;
+}
+
 
 static inline void ListCopyHelper(const List *oldList, List *newList)
 {
-	assert(oldList->data);
-	assert(newList->data);
-
 	size_t listSize = 0;
-	switch (oldList->data->type)
+	switch (oldList->type)
 	{
 		case LIST_POINTER:
 		case LIST_UINT64:
@@ -54,32 +59,31 @@ static inline void ListCopyHelper(const List *oldList, List *newList)
 			listSize = oldList->length * 4;
 			break;
 	}
-	assert(!newList->data->pointerData);
-	newList->data->pointerData = malloc(listSize);
-	CheckAlloc(newList->data->pointerData);
-	memcpy(newList->data->pointerData, oldList->data->pointerData, listSize);
+	assert(!newList->pointerData);
+	newList->pointerData = malloc(listSize);
+	CheckAlloc(newList->pointerData);
+	memcpy(newList->pointerData, oldList->pointerData, listSize);
 	newList->length = oldList->length;
 }
 
 void _ListCopy(const List *restrict oldList, List *restrict newList)
 {
-	assert(oldList && oldList->data);
+	assert(oldList);
 	assert(newList);
 
 	_ListFree(newList);
-	// ReSharper disable once CppDFANullDereference CLion what are you talking about it cannot possibly be null
-	_ListInit(newList, oldList->data->type);
+	_ListInit(newList, oldList->type);
 	ListCopyHelper(oldList, newList);
 }
 
 void _LockingListCopy(const LockingList *restrict oldList, LockingList *restrict newList)
 {
-	assert(oldList && oldList->data);
+	assert(oldList);
 	assert(newList);
 
 	ListLock(*oldList);
 	_LockingListFree(newList);
-	_LockingListInit(newList, oldList->data->type);
+	_LockingListInit(newList, oldList->type);
 	ListCopyHelper((const List *)oldList, (List *)newList);
 	ListUnlock(*oldList);
 }
@@ -89,27 +93,27 @@ void _ListAdd(List *list, void *data)
 {
 	assert(list);
 
-	switch (list->data->type)
+	switch (list->type)
 	{
 		case LIST_POINTER:
-			list->data->pointerData = GameReallocArray(list->data->pointerData, list->length + 1, sizeof(void *));
-			CheckAlloc(list->data->pointerData);
-			list->data->pointerData[list->length] = data;
+			list->pointerData = GameReallocArray(list->pointerData, list->length + 1, sizeof(void *));
+			CheckAlloc(list->pointerData);
+			list->pointerData[list->length] = data;
 			break;
 		case LIST_UINT64:
-			list->data->uint64Data = GameReallocArray(list->data->uint64Data, list->length + 1, sizeof(uint64_t));
-			CheckAlloc(list->data->uint64Data);
-			list->data->uint64Data[list->length] = (uint64_t)(uintptr_t)data;
+			list->uint64Data = GameReallocArray(list->uint64Data, list->length + 1, sizeof(uint64_t));
+			CheckAlloc(list->uint64Data);
+			list->uint64Data[list->length] = (uint64_t)(uintptr_t)data;
 			break;
 		case LIST_UINT32:
-			list->data->uint32Data = GameReallocArray(list->data->uint32Data, list->length + 1, sizeof(uint32_t));
-			CheckAlloc(list->data->uint32Data);
-			list->data->uint32Data[list->length] = (uint32_t)(uintptr_t)data;
+			list->uint32Data = GameReallocArray(list->uint32Data, list->length + 1, sizeof(uint32_t));
+			CheckAlloc(list->uint32Data);
+			list->uint32Data[list->length] = (uint32_t)(uintptr_t)data;
 			break;
 		case LIST_INT32:
-			list->data->int32Data = GameReallocArray(list->data->int32Data, list->length + 1, sizeof(int32_t));
-			CheckAlloc(list->data->int32Data);
-			list->data->int32Data[list->length] = (int32_t)(uintptr_t)data;
+			list->int32Data = GameReallocArray(list->int32Data, list->length + 1, sizeof(int32_t));
+			CheckAlloc(list->int32Data);
+			list->int32Data[list->length] = (int32_t)(uintptr_t)data;
 			break;
 	}
 	list->length++;
@@ -124,25 +128,45 @@ void _LockingListAdd(LockingList *list, void *data)
 	ListUnlock(*list);
 }
 
+void _SortedListAdd(SortedList *list, void *data)
+{
+	// TODO: Fast insert logic
+	assert(list);
+
+	_ListAdd((List *)list, data);
+
+	switch (list->type)
+	{
+		case LIST_POINTER:
+		case LIST_UINT64:
+			qsort(list->pointerData, list->length, sizeof(uint64_t), list->CompareFunction);
+			break;
+		case LIST_UINT32:
+		case LIST_INT32:
+			qsort(list->pointerData, list->length, sizeof(uint32_t), list->CompareFunction);
+			break;
+	}
+}
+
 
 void _ListSet(const List *list, const size_t index, void *data)
 {
 	assert(list);
 	assert(index <= list->length);
 
-	switch (list->data->type)
+	switch (list->type)
 	{
 		case LIST_POINTER:
-			list->data->pointerData[index] = data;
+			list->pointerData[index] = data;
 			break;
 		case LIST_UINT64:
-			list->data->uint64Data[index] = (uint64_t)(uintptr_t)data;
+			list->uint64Data[index] = (uint64_t)(uintptr_t)data;
 			break;
 		case LIST_UINT32:
-			list->data->uint32Data[index] = (uint32_t)(uintptr_t)data;
+			list->uint32Data[index] = (uint32_t)(uintptr_t)data;
 			break;
 		case LIST_INT32:
-			list->data->int32Data[index] = (int32_t)(uintptr_t)data;
+			list->int32Data[index] = (int32_t)(uintptr_t)data;
 			break;
 	}
 }
@@ -158,37 +182,29 @@ void _LockingListSet(const LockingList *list, const size_t index, void *data)
 }
 
 
-void ListRemoveAtHelper(const List *list, const size_t index)
+void ListRemoveAtHelper(List *list, const size_t index)
 {
-	switch (list->data->type)
+	switch (list->type)
 	{
 		case LIST_POINTER:
-			memmove(&list->data->pointerData[index],
-					&list->data->pointerData[index + 1],
-					sizeof(void *) * (list->length - index));
-			list->data->pointerData = GameReallocArray(list->data->pointerData, list->length, sizeof(void *));
-			CheckAlloc(list->data->pointerData);
+			memmove(&list->pointerData[index], &list->pointerData[index + 1], sizeof(void *) * (list->length - index));
+			list->pointerData = GameReallocArray(list->pointerData, list->length, sizeof(void *));
+			CheckAlloc(list->pointerData);
 			break;
 		case LIST_UINT64:
-			memmove(&list->data->uint64Data[index],
-					&list->data->uint64Data[index + 1],
-					sizeof(uint64_t) * (list->length - index));
-			list->data->uint64Data = GameReallocArray(list->data->uint64Data, list->length, sizeof(uint64_t));
-			CheckAlloc(list->data->uint64Data);
+			memmove(&list->uint64Data[index], &list->uint64Data[index + 1], sizeof(uint64_t) * (list->length - index));
+			list->uint64Data = GameReallocArray(list->uint64Data, list->length, sizeof(uint64_t));
+			CheckAlloc(list->uint64Data);
 			break;
 		case LIST_UINT32:
-			memmove(&list->data->uint32Data[index],
-					&list->data->uint32Data[index + 1],
-					sizeof(uint32_t) * (list->length - index));
-			list->data->uint32Data = GameReallocArray(list->data->uint32Data, list->length, sizeof(uint32_t));
-			CheckAlloc(list->data->uint32Data);
+			memmove(&list->uint32Data[index], &list->uint32Data[index + 1], sizeof(uint32_t) * (list->length - index));
+			list->uint32Data = GameReallocArray(list->uint32Data, list->length, sizeof(uint32_t));
+			CheckAlloc(list->uint32Data);
 			break;
 		case LIST_INT32:
-			memmove(&list->data->int32Data[index],
-					&list->data->int32Data[index + 1],
-					sizeof(int32_t) * (list->length - index));
-			list->data->int32Data = GameReallocArray(list->data->int32Data, list->length, sizeof(int32_t));
-			CheckAlloc(list->data->int32Data);
+			memmove(&list->int32Data[index], &list->int32Data[index + 1], sizeof(int32_t) * (list->length - index));
+			list->int32Data = GameReallocArray(list->int32Data, list->length, sizeof(int32_t));
+			CheckAlloc(list->int32Data);
 			break;
 	}
 }
@@ -197,13 +213,13 @@ void _ListRemoveAt(List *list, const size_t index)
 {
 	assert(list);
 	assert(index <= list->length);
-	assert(list->length && list->data);
+	assert(list->length);
 
 	list->length--;
 	if (list->length == 0)
 	{
-		free(list->data->pointerData);
-		list->data->pointerData = NULL;
+		free(list->pointerData);
+		list->pointerData = NULL;
 		return;
 	}
 	ListRemoveAtHelper(list, index);
@@ -213,14 +229,14 @@ void _LockingListRemoveAt(LockingList *list, const size_t index)
 {
 	assert(list);
 	assert(index <= list->length);
-	assert(list->length && list->data);
+	assert(list->length);
 
 	ListLock(*list);
 	list->length--;
 	if (list->length == 0)
 	{
-		free(list->data->pointerData);
-		list->data->pointerData = NULL;
+		free(list->pointerData);
+		list->pointerData = NULL;
 
 		ListUnlock(*list);
 		return;
@@ -244,39 +260,37 @@ void _ListInsertAfter(List *list, size_t index, void *data)
 
 	index++;
 	list->length++;
-	switch (list->data->type)
+	switch (list->type)
 	{
 		case LIST_POINTER:
-			list->data->pointerData = GameReallocArray(list->data->pointerData, list->length, sizeof(void *));
-			CheckAlloc(list->data->pointerData);
-			memmove(&list->data->pointerData[index + 1],
-					&list->data->pointerData[index],
+			list->pointerData = GameReallocArray(list->pointerData, list->length, sizeof(void *));
+			CheckAlloc(list->pointerData);
+			memmove(&list->pointerData[index + 1],
+					&list->pointerData[index],
 					sizeof(void *) * (list->length - index - 1));
-			list->data->pointerData[index] = data;
+			list->pointerData[index] = data;
 			break;
 		case LIST_UINT64:
-			list->data->uint64Data = GameReallocArray(list->data->uint64Data, list->length, sizeof(uint64_t));
-			CheckAlloc(list->data->uint64Data);
-			memmove(&list->data->uint64Data[index + 1],
-					&list->data->uint64Data[index],
+			list->uint64Data = GameReallocArray(list->uint64Data, list->length, sizeof(uint64_t));
+			CheckAlloc(list->uint64Data);
+			memmove(&list->uint64Data[index + 1],
+					&list->uint64Data[index],
 					sizeof(uint64_t) * (list->length - index - 1));
-			list->data->uint64Data[index] = (uint64_t)(uintptr_t)data;
+			list->uint64Data[index] = (uint64_t)(uintptr_t)data;
 			break;
 		case LIST_UINT32:
-			list->data->uint32Data = GameReallocArray(list->data->uint32Data, list->length, sizeof(uint32_t));
-			CheckAlloc(list->data->uint32Data);
-			memmove(&list->data->uint32Data[index + 1],
-					&list->data->uint32Data[index],
+			list->uint32Data = GameReallocArray(list->uint32Data, list->length, sizeof(uint32_t));
+			CheckAlloc(list->uint32Data);
+			memmove(&list->uint32Data[index + 1],
+					&list->uint32Data[index],
 					sizeof(uint32_t) * (list->length - index - 1));
-			list->data->uint32Data[index] = (uint32_t)(uintptr_t)data;
+			list->uint32Data[index] = (uint32_t)(uintptr_t)data;
 			break;
 		case LIST_INT32:
-			list->data->int32Data = GameReallocArray(list->data->int32Data, list->length, sizeof(int32_t));
-			CheckAlloc(list->data->int32Data);
-			memmove(&list->data->int32Data[index + 1],
-					&list->data->int32Data[index],
-					sizeof(int32_t) * (list->length - index - 1));
-			list->data->int32Data[index] = (int32_t)(uintptr_t)data;
+			list->int32Data = GameReallocArray(list->int32Data, list->length, sizeof(int32_t));
+			CheckAlloc(list->int32Data);
+			memmove(&list->int32Data[index + 1], &list->int32Data[index], sizeof(int32_t) * (list->length - index - 1));
+			list->int32Data[index] = (int32_t)(uintptr_t)data;
 			break;
 	}
 }
@@ -293,35 +307,35 @@ void _LockingListInsertAfter(LockingList *list, const size_t index, void *data)
 
 size_t _ListFind(const List *list, const void *data)
 {
-	if (!list->length || !list->data)
+	if (!list->length)
 	{
 		return -1;
 	}
 
 	for (size_t i = 0; i < list->length; i++)
 	{
-		switch (list->data->type)
+		switch (list->type)
 		{
 			case LIST_POINTER:
-				if (list->data->pointerData[i] == data)
+				if (list->pointerData[i] == data)
 				{
 					return i;
 				}
 				break;
 			case LIST_UINT64:
-				if (list->data->uint64Data[i] == (uint64_t)(uintptr_t)data)
+				if (list->uint64Data[i] == (uint64_t)(uintptr_t)data)
 				{
 					return i;
 				}
 				break;
 			case LIST_UINT32:
-				if (list->data->uint32Data[i] == (uint32_t)(uintptr_t)data)
+				if (list->uint32Data[i] == (uint32_t)(uintptr_t)data)
 				{
 					return i;
 				}
 				break;
 			case LIST_INT32:
-				if (list->data->int32Data[i] == (int32_t)(uintptr_t)data)
+				if (list->int32Data[i] == (int32_t)(uintptr_t)data)
 				{
 					return i;
 				}
@@ -333,7 +347,7 @@ size_t _ListFind(const List *list, const void *data)
 
 size_t _LockingListFind(LockingList *list, const void *data)
 {
-	if (!list->length || !list->data)
+	if (!list->length)
 	{
 		return -1;
 	}
@@ -341,31 +355,31 @@ size_t _LockingListFind(LockingList *list, const void *data)
 	ListLock(*list);
 	for (size_t i = 0; i < list->length; i++)
 	{
-		switch (list->data->type)
+		switch (list->type)
 		{
 			case LIST_POINTER:
-				if (list->data->pointerData[i] == data)
+				if (list->pointerData[i] == data)
 				{
 					ListUnlock(*list);
 					return i;
 				}
 				break;
 			case LIST_UINT64:
-				if (list->data->uint64Data[i] == (uint64_t)(uintptr_t)data)
+				if (list->uint64Data[i] == (uint64_t)(uintptr_t)data)
 				{
 					ListUnlock(*list);
 					return i;
 				}
 				break;
 			case LIST_UINT32:
-				if (list->data->uint32Data[i] == (uint32_t)(uintptr_t)data)
+				if (list->uint32Data[i] == (uint32_t)(uintptr_t)data)
 				{
 					ListUnlock(*list);
 					return i;
 				}
 				break;
 			case LIST_INT32:
-				if (list->data->int32Data[i] == (int32_t)(uintptr_t)data)
+				if (list->int32Data[i] == (int32_t)(uintptr_t)data)
 				{
 					ListUnlock(*list);
 					return i;
@@ -375,6 +389,29 @@ size_t _LockingListFind(LockingList *list, const void *data)
 	}
 	ListUnlock(*list);
 	return -1;
+}
+
+size_t _SortedListFind(const SortedList *list, const void *data)
+{
+	assert(list);
+
+	const void *foundElement = NULL;
+	switch (list->type)
+	{
+		case LIST_POINTER:
+		case LIST_UINT64:
+			foundElement = bsearch(data, list->pointerData, list->length, sizeof(uint64_t), list->CompareFunction);
+			break;
+		case LIST_UINT32:
+		case LIST_INT32:
+			foundElement = bsearch(data, list->pointerData, list->length, sizeof(uint32_t), list->CompareFunction);
+			break;
+	}
+	if (foundElement == NULL)
+	{
+		return -1;
+	}
+	return (size_t)((uintptr_t)list->pointerData - (uintptr_t)foundElement);
 }
 
 
@@ -406,8 +443,8 @@ void _ListClear(List *list)
 	assert(list);
 
 	list->length = 0;
-	free(list->data->pointerData);
-	list->data->pointerData = NULL;
+	free(list->pointerData);
+	list->pointerData = NULL;
 }
 
 void _LockingListClear(LockingList *list)
@@ -424,15 +461,15 @@ void _ListZero(const List *list)
 {
 	assert(list);
 
-	switch (list->data->type)
+	switch (list->type)
 	{
 		case LIST_POINTER:
 		case LIST_UINT64:
-			memset(list->data->pointerData, 0, list->length * 8);
+			memset(list->pointerData, 0, list->length * 8);
 			break;
 		case LIST_UINT32:
 		case LIST_INT32:
-			memset(list->data->pointerData, 0, list->length * 4);
+			memset(list->pointerData, 0, list->length * 4);
 			break;
 	}
 }
@@ -451,13 +488,8 @@ void _ListFree(List *list)
 {
 	assert(list);
 
-	if (list->data)
-	{
-		free(list->data->pointerData);
-		list->data->pointerData = NULL;
-		free(list->data);
-		list->data = NULL;
-	}
+	free(list->pointerData);
+	list->pointerData = NULL;
 	list->length = 0;
 }
 
@@ -476,13 +508,13 @@ void _LockingListFree(LockingList *list)
 void _ListFreeOnlyContents(const List *list)
 {
 	assert(list);
-	assert(!list->data || list->data->type == LIST_POINTER);
+	assert(list->type == LIST_POINTER);
 
-	if (list->length && list->data)
+	if (list->length)
 	{
 		for (size_t i = 0; i < list->length; i++)
 		{
-			free(list->data->pointerData[i]);
+			free(list->pointerData[i]);
 		}
 	}
 }
@@ -490,14 +522,14 @@ void _ListFreeOnlyContents(const List *list)
 void _LockingListFreeOnlyContents(const LockingList *list)
 {
 	assert(list);
-	assert(list->data->type == LIST_POINTER);
+	assert(list->type == LIST_POINTER);
 
 	ListLock(*list);
-	if (list->length && list->data)
+	if (list->length)
 	{
 		for (size_t i = 0; i < list->length; i++)
 		{
-			free(list->data->pointerData[i]);
+			free(list->pointerData[i]);
 		}
 	}
 	ListUnlock(*list);

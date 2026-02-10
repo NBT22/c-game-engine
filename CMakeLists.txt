@@ -22,7 +22,7 @@ set(X86_64_VERSION "3" CACHE STRING "The x86_64 microarchitecture level to targe
 
 #region Compile flags
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-missing-field-initializers -Wno-c23-extensions -fvisibility=hidden -Wundef -fPIC ${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-missing-field-initializers -Wno-c23-extensions -Wno-microsoft-anon-tag -fvisibility=hidden -Wundef -fPIC -fms-extensions ${CMAKE_C_FLAGS}")
 
 set(CMAKE_C_FLAGS_DEBUG "-g -O0")
 set(CMAKE_C_FLAGS_RELEASE "-g0 -O3 -s -DNDEBUG -Wl,--gc-sections -fdata-sections -ffunction-sections")
@@ -45,7 +45,7 @@ set(ENGINE_SOURCE_DIR ${CMAKE_SOURCE_DIR} CACHE PATH "The root directory of the 
 
 if (NOT STANDALONE_LAUNCHER)
     add_subdirectory(game)
-else()
+else ()
     add_custom_target(game)
 endif ()
 
