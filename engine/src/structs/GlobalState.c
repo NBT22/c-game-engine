@@ -158,15 +158,6 @@ void ChangeMap(Map *map)
 	}
 	state.map = map;
 	LoadMapModels(map);
-	// if (strncmp(map->music, "none", 4) != 0)
-	// {
-	// 	char musicPath[80];
-	// 	snprintf(musicPath, sizeof(musicPath), SOUND("%s"), map->music);
-	// 	ChangeMusic(musicPath);
-	// } else
-	// {
-	// 	StopMusic();
-	// }
 
 	PhysicsThreadUnlockTickMutex();
 }
@@ -177,6 +168,12 @@ void DestroyGlobalState()
 	SaveOptions(&state.options);
 	DestroyMap(state.map);
 	state.map = NULL;
+	for (size_t i = 0; i < state.saveData->items.length; i++)
+	{
+		Item *item = &ListGet(state.saveData->items, i, Item);
+		item->definition->Destruct(item);
+	}
+	ListFree(state.saveData->items);
 	free(state.saveData);
 	free(state.camera);
 
