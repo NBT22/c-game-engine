@@ -551,7 +551,7 @@ bool VK_RenderMap(const Map *map, const Camera *camera)
 		.stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
 	};
 	VulkanTest(lunaWriteDataToBuffer(buffers.uniforms.lighting, &lightingBufferWriteInfo),
-						   "Failed to update lighting data!");
+			   "Failed to update lighting data!");
 
 	float fog[6]; // r, g, b, a, start, end
 	fog[0] = map->fogColor.r;
@@ -565,8 +565,7 @@ bool VK_RenderMap(const Map *map, const Camera *camera)
 		.data = fog,
 		.stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	};
-	VulkanTest(lunaWriteDataToBuffer(buffers.uniforms.fog, &fogBufferWriteInfo),
-						   "Failed to update fog data!");
+	VulkanTest(lunaWriteDataToBuffer(buffers.uniforms.fog, &fogBufferWriteInfo), "Failed to update fog data!");
 
 	VulkanTest(UpdateCameraUniform(camera), "Failed to update transform matrix!");
 
@@ -620,12 +619,10 @@ bool VK_FrameEnd()
 {
 	if ((pendingTasks & PENDING_TASK_UI_BUFFERS_RESIZE_BIT) == PENDING_TASK_UI_BUFFERS_RESIZE_BIT)
 	{
-		VulkanTest(lunaGrowBuffer(&buffers.ui.vertexBuffer,
-											  buffers.ui.allocatedQuads * 4 * sizeof(UiVertex)),
-							   "Failed to recreate UI vertex buffer!");
-		VulkanTest(lunaGrowBuffer(&buffers.ui.indexBuffer,
-											  buffers.ui.allocatedQuads * 6 * sizeof(uint32_t)),
-							   "Failed to recreate UI index buffer!");
+		VulkanTest(lunaGrowBuffer(&buffers.ui.vertexBuffer, buffers.ui.allocatedQuads * 4 * sizeof(UiVertex)),
+				   "Failed to recreate UI vertex buffer!");
+		VulkanTest(lunaGrowBuffer(&buffers.ui.indexBuffer, buffers.ui.allocatedQuads * 6 * sizeof(uint32_t)),
+				   "Failed to recreate UI index buffer!");
 
 		pendingTasks ^= PENDING_TASK_UI_BUFFERS_RESIZE_BIT;
 	}
@@ -643,9 +640,9 @@ bool VK_FrameEnd()
 			.stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 		};
 		VulkanTest(lunaWriteDataToBuffer(buffers.ui.vertexBuffer, &vertexBufferWriteInfo),
-							   "Failed to write UI vertex buffer!");
+				   "Failed to write UI vertex buffer!");
 		VulkanTest(lunaWriteDataToBuffer(buffers.ui.indexBuffer, &indexBufferWriteInfo),
-							   "Failed to write UI index buffer!");
+				   "Failed to write UI index buffer!");
 	}
 
 	if (LockLodThreadMutex() != 0)
@@ -695,10 +692,10 @@ bool VK_FrameEnd()
 			.instanceCount = 1,
 		};
 		VulkanTest(lunaDrawBufferIndexed(buffers.ui.vertexBuffer,
-													 buffers.ui.indexBuffer,
-													 VK_INDEX_TYPE_UINT32,
-													 &drawInfo),
-							   "Failed to draw UI!");
+										 buffers.ui.indexBuffer,
+										 VK_INDEX_TYPE_UINT32,
+										 &drawInfo),
+				   "Failed to draw UI!");
 	}
 
 	lunaEndRenderPass();
