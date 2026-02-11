@@ -9,14 +9,11 @@
 #include <engine/graphics/RenderingHelpers.h> // NOLINT(*-include-cleaner)
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
-#include <engine/structs/List.h>
 #include <engine/structs/Map.h>
-#include <engine/structs/Viewmodel.h>
 #include <joltc/Math/Vector3.h>
 #include <SDL_video.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <vulkan/vulkan_core.h>
 
 #ifdef BUILDSTYLE_DEBUG
 /**
@@ -42,9 +39,7 @@
  */
 bool VK_Init(SDL_Window *window);
 
-bool VK_UpdateActors(const LockingList *actors, bool shouldReloadActors);
-
-VkResult VK_FrameStart();
+bool VK_FrameStart();
 
 /**
  * Render a given map. This function will automatically load the map if it is not yet loaded, then it will update
@@ -54,9 +49,11 @@ VkResult VK_FrameStart();
  * @param camera The camera from which the map should be rendered
  * @return @c VK_SUCCESS if the map was rendered successfully, or a meaningful result code otherwise
  */
-VkResult VK_RenderMap(const Map *map, const Camera *camera);
+bool VK_RenderMap(const Map *map, const Camera *camera);
 
-VkResult VK_FrameEnd();
+bool VK_FrameEnd();
+
+bool VK_LoadMap(const Map *map);
 
 /// A function used to destroy the Vulkan objects when they are no longer needed.
 bool VK_Cleanup();

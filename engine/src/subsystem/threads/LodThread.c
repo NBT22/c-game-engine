@@ -79,10 +79,10 @@ int LodThreadMain(void * /*data*/)
 				shouldReloadActors = true;
 			}
 		}
-		if (currentRenderer == RENDERER_VULKAN && !VK_UpdateActors(actors, shouldReloadActors))
-		{
-			Error("Failed to load actors!");
-		}
+		// if (currentRenderer == RENDERER_VULKAN && !VK_UpdateActors(actors, shouldReloadActors))
+		// {
+		// 	Error("Failed to load actors!");
+		// }
 
 		if (SDL_UnlockMutex(mutex) != 0)
 		{

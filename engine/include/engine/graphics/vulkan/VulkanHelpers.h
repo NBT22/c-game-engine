@@ -59,8 +59,8 @@
 					.width = LUNA_RENDER_PASS_WIDTH_SWAPCHAIN_WIDTH, \
 					.height = LUNA_RENDER_PASS_HEIGHT_SWAPCHAIN_HEIGHT, \
 				}; \
-				VulkanTestReturnResult(lunaResizeSwapchain(1, &renderPassResizeInfo, NULL, &swapChainExtent), \
-									   "Failed to resize swapchain!"); \
+				VulkanTest(lunaResizeSwapchain(1, &renderPassResizeInfo, NULL, &swapChainExtent), \
+						   "Failed to resize swapchain!"); \
 				if (UnlockLodThreadMutex() != 0) \
 				{ \
 					LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError()); \
@@ -68,7 +68,7 @@
 				} \
 				return resizeCheckResult; \
 			} \
-			VulkanTestReturnResult(resizeCheckResult, __VA_ARGS__); \
+			VulkanTest(resizeCheckResult, __VA_ARGS__); \
 		} \
 	}
 #pragma endregion macros
