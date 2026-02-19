@@ -66,7 +66,7 @@ static void TriggerDisableHandler(Actor *this, const Actor * /*sender*/, const P
 	data->enabled = false;
 }
 
-static void TriggerOnPlayerContactAdded(Actor *this, JPH_BodyId /*bodyId*/)
+static void TriggerOnPlayerContactAdded(Actor *this, JPH_BodyID /*bodyId*/)
 {
 	const TriggerData *data = this->extraData;
 	if (data->enabled)
@@ -76,7 +76,7 @@ static void TriggerOnPlayerContactAdded(Actor *this, JPH_BodyId /*bodyId*/)
 	}
 }
 
-static void TriggerOnPlayerContactPersisted(Actor *this, JPH_BodyId /*bodyId*/)
+static void TriggerOnPlayerContactPersisted(Actor *this, JPH_BodyID /*bodyId*/)
 {
 	const TriggerData *data = this->extraData;
 	if (!data->oneShot && data->enabled)
@@ -85,7 +85,7 @@ static void TriggerOnPlayerContactPersisted(Actor *this, JPH_BodyId /*bodyId*/)
 	}
 }
 
-static void TriggerOnPlayerContactRemoved(Actor *this, JPH_BodyId /*bodyId*/)
+static void TriggerOnPlayerContactRemoved(Actor *this, JPH_BodyID /*bodyId*/)
 {
 	const TriggerData *data = this->extraData;
 	if (data->enabled)
@@ -112,8 +112,7 @@ void TriggerInit(Actor *this, const KvList params, Transform *transform)
 	CreateTriggerSensor(this, transform);
 }
 
-static ActorDefinition definition = {
-	.actorType = ACTOR_TYPE_TRIGGER,
+ActorDefinition triggerActorDefinition = {
 	.Update = DefaultActorUpdate,
 	.OnPlayerContactAdded = TriggerOnPlayerContactAdded,
 	.OnPlayerContactPersisted = TriggerOnPlayerContactPersisted,
@@ -125,9 +124,9 @@ static ActorDefinition definition = {
 
 void RegisterTrigger()
 {
-	RegisterDefaultActorInputs(&definition);
-	RegisterActorInput(&definition, TRIGGER_INPUT_FORCE_TRIGGER, TriggerForceTriggerHandler);
-	RegisterActorInput(&definition, TRIGGER_INPUT_ENABLE, TriggerEnableHandler);
-	RegisterActorInput(&definition, TRIGGER_INPUT_DISABLE, TriggerDisableHandler);
-	RegisterActor(TRIGGER_ACTOR_NAME, &definition);
+	RegisterDefaultActorInputs(&triggerActorDefinition);
+	RegisterActorInput(&triggerActorDefinition, TRIGGER_INPUT_FORCE_TRIGGER, TriggerForceTriggerHandler);
+	RegisterActorInput(&triggerActorDefinition, TRIGGER_INPUT_ENABLE, TriggerEnableHandler);
+	RegisterActorInput(&triggerActorDefinition, TRIGGER_INPUT_DISABLE, TriggerDisableHandler);
+	RegisterActor(TRIGGER_ACTOR_NAME, &triggerActorDefinition);
 }

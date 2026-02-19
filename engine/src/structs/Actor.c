@@ -13,24 +13,28 @@
 #include <engine/structs/Map.h>
 #include <engine/subsystem/Error.h>
 #include <engine/subsystem/Logging.h>
-#include <joltc/constants.h>
 #include <joltc/enums.h>
 #include <joltc/joltc.h>
 #include <joltc/Math/Transform.h>
 #include <joltc/Math/Vector3.h>
 #include <joltc/Physics/Body/BodyCreationSettings.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
-#include <joltc/types.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+static uint64_t actorId;
 
 Actor *CreateActor(Transform *transform, const char *actorType, KvList params, JPH_BodyInterface *bodyInterface)
 {
 	Actor *actor = malloc(sizeof(Actor));
 	CheckAlloc(actor);
+	// Simply incrementing this is fine, because if one actor were loaded every nanosecond it would take ~585 years to overflow
+	actor->id = actorId++;
 	actor->actorFlags = 0;
 	actor->bodyInterface = bodyInterface;
 	actor->bodyId = JPH_BodyId_InvalidBodyID;
@@ -41,7 +45,7 @@ Actor *CreateActor(Transform *transform, const char *actorType, KvList params, J
 	actor->currentSkinIndex = 0;
 	actor->currentLod = 0;
 	actor->modColor = COLOR_WHITE;
-	ListInit(actor->ioConnections, LIST_POINTER);
+	ListInit(actor->ioConnections, ActorConnection);
 	actor->extraData = NULL;
 	const ActorDefinition *definition = GetActorDefinition(actorType);
 	actor->definition = definition;
@@ -71,8 +75,7 @@ void FreeActor(Actor *actor)
 	}
 	for (size_t i = 0; i < actor->ioConnections.length; i++)
 	{
-		ActorConnection *connection = ListGetPointer(actor->ioConnections, i);
-		DestroyActorConnection(connection);
+		DestroyActorConnection(&ListGet(actor->ioConnections, i, ActorConnection));
 	}
 	ListFree(actor->ioConnections);
 	free(actor);
@@ -97,7 +100,7 @@ void ActorFireOutput(const Actor *sender, const char *output, const Param defaul
 	ListLock(sender->ioConnections);
 	for (size_t i = 0; i < sender->ioConnections.length; i++)
 	{
-		const ActorConnection *connection = ListGetPointer(sender->ioConnections, i);
+		const ActorConnection *connection = &ListGet(sender->ioConnections, i, ActorConnection);
 		if (strcmp(connection->sourceActorOutput, output) == 0)
 		{
 			List actors;
@@ -109,13 +112,12 @@ void ActorFireOutput(const Actor *sender, const char *output, const Param defaul
 			}
 			for (size_t j = 0; j < actors.length; j++)
 			{
-				Actor *actor = ListGetPointer(actors, j);
 				const Param *param = &defaultParam;
 				if (connection->outParamOverride.type != PARAM_TYPE_NONE)
 				{
 					param = &connection->outParamOverride;
 				}
-				ActorTriggerInput(sender, actor, connection->targetActorInput, param);
+				ActorTriggerInput(sender, ListGet(actors, j, Actor *), connection->targetActorInput, param);
 			}
 			ListFree(actors);
 		}
@@ -129,7 +131,6 @@ void DestroyActorConnection(ActorConnection *connection)
 	free(connection->sourceActorOutput);
 	free(connection->targetActorInput);
 	FreeParam(&connection->outParamOverride);
-	free(connection);
 }
 void DefaultActorUpdate(Actor * /*this*/, double /*delta*/) {}
 
@@ -138,11 +139,11 @@ void ActorSignalKill(Actor *this, const Actor * /*sender*/, const Param * /*para
 	RemoveActor(this);
 }
 
-void DefaultActorOnPlayerContactAdded(Actor * /*this*/, JPH_BodyId /*bodyId*/) {}
+void DefaultActorOnPlayerContactAdded(Actor * /*this*/, JPH_BodyID /*bodyId*/) {}
 
-void DefaultActorOnPlayerContactPersisted(Actor * /*this*/, JPH_BodyId /*bodyId*/) {}
+void DefaultActorOnPlayerContactPersisted(Actor * /*this*/, JPH_BodyID /*bodyId*/) {}
 
-void DefaultActorOnPlayerContactRemoved(Actor * /*this*/, JPH_BodyId /*bodyId*/) {}
+void DefaultActorOnPlayerContactRemoved(Actor * /*this*/, JPH_BodyID /*bodyId*/) {}
 
 void DefaultActorRenderUi(Actor * /*this*/) {}
 

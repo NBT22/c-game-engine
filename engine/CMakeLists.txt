@@ -55,7 +55,8 @@ fetch_package(https://github.com/NBT22/joltc main joltc)
 
 #endregion
 
-add_library(engine INTERFACE)
+add_library(engine INTERFACE
+        include/engine/graphics/vulkan/VulkanActors.h)
 target_sources(engine INTERFACE
         src/actor/IoProxy.c
         include/engine/actor/IoProxy.h
@@ -127,6 +128,7 @@ target_sources(engine INTERFACE
         include/engine/graphics/RenderingHelpers.h
         src/graphics/vulkan/Vulkan.c
         include/engine/graphics/vulkan/Vulkan.h
+        src/graphics/vulkan/VulkanActors.c
         src/graphics/vulkan/VulkanHelpers.c
         include/engine/graphics/vulkan/VulkanHelpers.h
         src/graphics/vulkan/VulkanInternal.c
@@ -223,7 +225,9 @@ if (x86_64)
     target_link_libraries(engine INTERFACE discord_game_sdk)
 endif ()
 
-if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
+target_include_directories(engine INTERFACE ${FETCHCONTENT_BASE_DIR}/glew-src/include)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_definitions(engine INTERFACE BUILDSTYLE_RELEASE)
 else ()
     target_compile_definitions(engine INTERFACE BUILDSTYLE_DEBUG)

@@ -22,8 +22,8 @@ typedef enum ModelShader ModelShader;
 typedef enum CollisionModelType CollisionModelType;
 
 typedef struct Material Material;
-typedef struct ModelLod ModelLod;
 typedef struct ModelVertex ModelVertex;
+typedef struct ModelLod ModelLod;
 typedef struct ModelDefinition ModelDefinition;
 typedef struct ModelConvexHull ModelConvexHull;
 typedef struct ModelStaticCollider ModelStaticCollider;

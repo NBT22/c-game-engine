@@ -46,17 +46,17 @@ int LodThreadMain(void * /*data*/)
 		const float lodMultiplier = state->options.lodMultiplier;
 		bool shouldReloadActors = false;
 		Vector3 actorPosition = {};
-		Vector3 offsetFromPlayer = {};
+		Vector3 offsetFromCamera = {};
 		for (size_t i = 0; i < actorCount; i++)
 		{
-			Actor *actor = ListGetPointer(*actors, i);
+			Actor *actor = ListGet(*actors, i, Actor *);
 			if (!actor->actorModel || actor->actorModel->lodCount == 1)
 			{
 				continue;
 			}
 			JPH_BodyInterface_GetPosition(actor->bodyInterface, actor->bodyId, &actorPosition);
-			Vector3_Subtract(&actorPosition, &state->map->player.transform.position, &offsetFromPlayer);
-			const float distanceSquared = Vector3_LengthSquared(&offsetFromPlayer);
+			Vector3_Subtract(&actorPosition, &state->camera->transform.position, &offsetFromCamera);
+			const float distanceSquared = Vector3_LengthSquared(&offsetFromCamera);
 			while (actor->currentLod != 0 &&
 				   actor->actorModel->lods[actor->currentLod].distanceSquared * lodMultiplier > distanceSquared)
 			{
@@ -70,10 +70,10 @@ int LodThreadMain(void * /*data*/)
 				shouldReloadActors = true;
 			}
 		}
-		if (currentRenderer == RENDERER_VULKAN && !VK_UpdateActors(actors, shouldReloadActors))
-		{
-			Error("Failed to load actors!");
-		}
+		// if (currentRenderer == RENDERER_VULKAN && !VK_UpdateActors(actors, shouldReloadActors))
+		// {
+		// 	Error("Failed to load actors!");
+		// }
 
 		SDL_UnlockMutex(mutex);
 		SDL_SignalSemaphore(hasEnded);

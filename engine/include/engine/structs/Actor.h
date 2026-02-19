@@ -12,6 +12,7 @@
 #include <engine/structs/KVList.h>
 #include <engine/structs/List.h>
 #include <joltc/Math/Transform.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <joltc/types.h>
 #include <stdbool.h>
@@ -50,10 +51,13 @@ struct ActorConnection
 
 struct Actor
 {
+	/// A unique ID used to represent this actor
+	uint64_t id;
+
 	/// Flags used to provide more information about the actor
 	uint32_t actorFlags;
 
-	JPH_BodyId bodyId;
+	JPH_BodyID bodyId;
 	JPH_BodyInterface *bodyInterface;
 
 	/// Whether the actor is currently visible
@@ -144,17 +148,17 @@ void ActorSignalKill(Actor *this, const Actor * /*sender*/, const Param * /*para
 /**
  * Default actor on player contact added function
  */
-void DefaultActorOnPlayerContactAdded(Actor * /*this*/, JPH_BodyId /*bodyId*/);
+void DefaultActorOnPlayerContactAdded(Actor * /*this*/, JPH_BodyID /*bodyId*/);
 
 /**
  * Default actor on player contact persisted function
  */
-void DefaultActorOnPlayerContactPersisted(Actor * /*this*/, JPH_BodyId /*bodyId*/);
+void DefaultActorOnPlayerContactPersisted(Actor * /*this*/, JPH_BodyID /*bodyId*/);
 
 /**
  * Default actor on player contact removed function
  */
-void DefaultActorOnPlayerContactRemoved(Actor * /*this*/, JPH_BodyId /*bodyId*/);
+void DefaultActorOnPlayerContactRemoved(Actor * /*this*/, JPH_BodyID /*bodyId*/);
 
 /**
  * Default actor render ui function

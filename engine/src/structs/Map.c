@@ -30,7 +30,7 @@ Map *CreateMap(void)
 {
 	Map *map = calloc(1, sizeof(Map));
 	CheckAlloc(map);
-	ListInit(map->actors, LIST_POINTER);
+	ListInit(map->actors, Actor *);
 	PhysicsInitMap(map);
 	CreatePlayer(&map->player, map->physicsSystem);
 	map->fogColor = COLOR(0xff000000);
@@ -39,9 +39,9 @@ Map *CreateMap(void)
 	map->lightColor = COLOR_WHITE;
 	map->physicsTick = 0;
 	map->changeFlags = 0;
-	ListInit(map->namedActorNames, LIST_POINTER);
-	ListInit(map->namedActorPointers, LIST_POINTER);
-	ListInit(map->joltBodies, LIST_UINT32);
+	ListInit(map->namedActorNames, const char *);
+	ListInit(map->namedActorPointers, Actor *);
+	ListInit(map->joltBodies, uint32_t);
 
 	Item *item = GetItem();
 	if (item)
@@ -59,7 +59,7 @@ void DestroyMap(Map *map)
 {
 	for (size_t i = 0; i < map->actors.length; i++)
 	{
-		FreeActor(ListGetPointer(map->actors, i));
+		FreeActor(ListGet(map->actors, i, Actor *));
 	}
 
 	for (size_t i = 0; i < map->modelCount; i++)
@@ -79,7 +79,7 @@ void DestroyMap(Map *map)
 
 	for (size_t i = 0; i < map->joltBodies.length; i++)
 	{
-		JPH_BodyInterface_RemoveAndDestroyBody(bodyInterface, ListGetUint32(map->joltBodies, i));
+		JPH_BodyInterface_RemoveAndDestroyBody(bodyInterface, ListGet(map->joltBodies, i, uint32_t));
 	}
 	ListFree(map->joltBodies);
 
@@ -105,7 +105,7 @@ void RemoveActor(Actor *actor)
 	const size_t nameIdx = ListFind(map->namedActorPointers, actor);
 	if (nameIdx != SIZE_MAX)
 	{
-		free(ListGetPointer(map->namedActorNames, nameIdx));
+		free(ListGet(map->namedActorNames, nameIdx, char *));
 		ListRemoveAt(map->namedActorNames, nameIdx);
 		ListRemoveAt(map->namedActorPointers, nameIdx);
 	}
@@ -121,7 +121,8 @@ void RemoveActor(Actor *actor)
 
 void NameActor(Actor *actor, const char *name, Map *map)
 {
-	ListAdd(map->namedActorNames, strdup(name));
+	const char *tempName = strdup(name);
+	ListAdd(map->namedActorNames, tempName);
 	ListAdd(map->namedActorPointers, actor);
 }
 
@@ -130,9 +131,9 @@ Actor *GetActorByName(const char *name, const Map *map)
 	ListLock(map->namedActorNames);
 	for (size_t i = 0; i < map->namedActorNames.length; i++)
 	{
-		if (strcmp(ListGetPointer(map->namedActorNames, i), name) == 0)
+		if (strcmp(ListGet(map->namedActorNames, i, const char *), name) == 0)
 		{
-			Actor *actor = ListGetPointer(map->namedActorPointers, i);
+			Actor *actor = ListGet(map->namedActorPointers, i, Actor *);
 			ListUnlock(map->namedActorNames);
 			return actor;
 		}
@@ -143,14 +144,13 @@ Actor *GetActorByName(const char *name, const Map *map)
 
 void GetActorsByName(const char *name, const Map *map, List *actors)
 {
-	ListInit(*actors, LIST_POINTER);
+	ListInit(*actors, Actor *);
 	ListLock(map->namedActorNames);
 	for (size_t i = 0; i < map->namedActorNames.length; i++)
 	{
-		const char *actorName = ListGetPointer(map->namedActorNames, i);
-		if (strcmp(actorName, name) == 0)
+		if (strcmp(ListGet(map->namedActorNames, i, const char *), name) == 0)
 		{
-			ListAdd(*actors, ListGetPointer(map->namedActorPointers, i));
+			ListAdd(*actors, ListGet(map->namedActorPointers, i, Actor *));
 		}
 	}
 	ListUnlock(map->namedActorNames);
@@ -164,7 +164,7 @@ void RenderMap(const Map *map, const Camera *camera)
 	ListLock(map->actors);
 	for (size_t i = 0; i < map->actors.length; i++)
 	{
-		Actor *actor = ListGetPointer(map->actors, i);
+		Actor *actor = ListGet(map->actors, i, Actor *);
 		actor->definition->RenderUi(actor);
 	}
 	ListUnlock(map->actors);

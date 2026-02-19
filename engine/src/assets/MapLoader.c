@@ -8,6 +8,7 @@
 #include <engine/assets/MapMaterialLoader.h>
 #include <engine/assets/ModelLoader.h>
 #include <engine/physics/Physics.h>
+#include <engine/physics/PlayerPhysics.h>
 #include <engine/structs/Actor.h>
 #include <engine/structs/ActorDefinition.h>
 #include <engine/structs/ActorWall.h>
@@ -17,7 +18,6 @@
 #include <engine/structs/Map.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
-#include <engine/subsystem/Logging.h>
 #include <joltc/enums.h>
 #include <joltc/joltc.h>
 #include <joltc/Math/Quat.h>
@@ -76,28 +76,27 @@ Map *LoadMap(const char *path)
 		Vector3 eulerAngles = {rotX, rotY, rotZ};
 		JPH_Quat_FromEulerAngles(&eulerAngles, &xfm.rotation);
 
-		LockingList ioConnections = {0};
-		ListInit(ioConnections, LIST_POINTER);
+		LockingList ioConnections;
+		ListInit(ioConnections, ActorConnection);
 		EXPECT_BYTES(sizeof(size_t), bytesRemaining);
 		const size_t numConnections = ReadSizeT(mapData->data, &offset);
 		for (size_t j = 0; j < numConnections; j++)
 		{
-			ActorConnection *connection = malloc(sizeof(ActorConnection));
-			CheckAlloc(connection);
-			connection->sourceActorOutput = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
+			ActorConnection connection = {0};
+			connection.sourceActorOutput = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
 			bytesRemaining -= strLength;
 			bytesRemaining += sizeof(size_t);
-			connection->targetActorName = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
+			connection.targetActorName = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
 			bytesRemaining -= strLength;
 			bytesRemaining += sizeof(size_t);
-			connection->targetActorInput = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
+			connection.targetActorInput = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
 			bytesRemaining -= strLength;
 			bytesRemaining += sizeof(size_t);
 			uint8_t hasOverride = ReadByte(mapData->data, &offset);
 			// TODO data size validation for params
-			size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection->outParamOverride);
+			size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection.outParamOverride);
 			bytesRemaining -= paramSize;
-			connection->numRefires = ReadSizeT(mapData->data, &offset);
+			connection.numRefires = ReadSizeT(mapData->data, &offset);
 			ListAdd(ioConnections, connection);
 		}
 		KvList params;
@@ -106,7 +105,7 @@ Map *LoadMap(const char *path)
 
 		if (strcmp(actorClass, "player") == 0)
 		{
-			map->player.transform = xfm;
+			TeleportPlayer(&map->player, &xfm);
 			KvListDestroy(params);
 			ListFree(ioConnections);
 			free(actorClass);
@@ -246,7 +245,7 @@ Map *LoadMap(const char *path)
 																							   OBJECT_LAYER_STATIC,
 																							   0);
 		JPH_BodyCreationSettings_SetFriction(bodyCreationSettings, 4.25f);
-		const JPH_BodyId body = JPH_BodyInterface_CreateAndAddBody(bodyInterface,
+		const JPH_BodyID body = JPH_BodyInterface_CreateAndAddBody(bodyInterface,
 																   bodyCreationSettings,
 																   JPH_Activation_Activate);
 		ListAdd(map->joltBodies, body);

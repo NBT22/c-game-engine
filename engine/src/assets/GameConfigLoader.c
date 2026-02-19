@@ -14,20 +14,43 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "engine/helpers/Arguments.h"
+#include "engine/structs/GlobalState.h"
+
 GameConfig gameConfig = {0};
 
 void LoadGameConfig()
 {
 	LogDebug("Loading game configuration...\n");
-	Asset *asset = DecompressAsset("game.game", false);
-	if (!asset || asset->type != ASSET_TYPE_GAME_CONFIG || asset->typeVersion != 1)
+
+	if (HasCliArg("--game"))
+	{
+		const char *gameArg = GetCliArgStr("--game", "assets");
+		SetAssetsPath(gameArg);
+	} else
+	{
+		const size_t pathLen = strlen(GetState()->executableFolder) + strlen("assets") + 1;
+		char *path = calloc(pathLen, 1);
+		CheckAlloc(path);
+		snprintf(path, pathLen, "%sassets", GetState()->executableFolder);
+		SetAssetsPath(path);
+		free(path);
+	}
+
+	Asset *asset = DecompressAsset("game.gkvl", false);
+	if (!asset || asset->type != ASSET_TYPE_KV_LIST || asset->typeVersion != 1)
 	{
 		Error("Invalid game configuration");
 	}
 	size_t offset = 0;
-	gameConfig.gameTitle = ReadStringSafe(asset->data, &offset, asset->size, NULL);
-	gameConfig.gameCopyright = ReadStringSafe(asset->data, &offset, asset->size, NULL);
-	gameConfig.discordAppId = ReadSizeT(asset->data, &offset);
+	KvList configList = {};
+	ReadKvList(asset->data, asset->size, &offset, configList);
+
+	gameConfig.gameTitle = strdup(KvGetString(configList, "game_title", "Untitled"));
+	gameConfig.gameCopyright = strdup(KvGetString(configList, "game_copyright", ""));
+	gameConfig.discordAppId = KvGetUint64(configList, "discord_app_id", 0);
+
+	KvListDestroy(configList);
 
 	FreeAsset(asset);
 }

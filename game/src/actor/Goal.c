@@ -73,7 +73,7 @@ static void GoalDisableHandler(Actor *this, const Actor * /*sender*/, const Para
 	data->enabled = false;
 }
 
-static void GoalOnPlayerContactAdded(Actor *this, JPH_BodyId /*bodyId*/)
+static void GoalOnPlayerContactAdded(Actor *this, JPH_BodyID /*bodyId*/)
 {
 	const GoalData *data = this->extraData;
 	if (data->enabled)
@@ -110,19 +110,20 @@ void GoalInit(Actor *this, const KvList params, Transform *transform)
 	CreateGoalSensor(this, &adjustedTransform);
 }
 
-static ActorDefinition definition = {.actorType = ACTOR_TYPE_GOAL,
-									 .Update = GoalUpdate,
-									 .OnPlayerContactAdded = GoalOnPlayerContactAdded,
-									 .OnPlayerContactPersisted = DefaultActorOnPlayerContactPersisted,
-									 .OnPlayerContactRemoved = DefaultActorOnPlayerContactRemoved,
-									 .RenderUi = DefaultActorRenderUi,
-									 .Destroy = DefaultActorDestroy,
-									 .Init = GoalInit};
+ActorDefinition goalActorDefinition = {
+	.Update = GoalUpdate,
+	.OnPlayerContactAdded = GoalOnPlayerContactAdded,
+	.OnPlayerContactPersisted = DefaultActorOnPlayerContactPersisted,
+	.OnPlayerContactRemoved = DefaultActorOnPlayerContactRemoved,
+	.RenderUi = DefaultActorRenderUi,
+	.Destroy = DefaultActorDestroy,
+	.Init = GoalInit,
+};
 
 void RegisterGoal()
 {
-	RegisterDefaultActorInputs(&definition);
-	RegisterActorInput(&definition, GOAL_INPUT_ENABLE, GoalEnableHandler);
-	RegisterActorInput(&definition, GOAL_INPUT_DISABLE, GoalDisableHandler);
-	RegisterActor(GOAL_ACTOR_NAME, &definition);
+	RegisterDefaultActorInputs(&goalActorDefinition);
+	RegisterActorInput(&goalActorDefinition, GOAL_INPUT_ENABLE, GoalEnableHandler);
+	RegisterActorInput(&goalActorDefinition, GOAL_INPUT_DISABLE, GoalDisableHandler);
+	RegisterActor(GOAL_ACTOR_NAME, &goalActorDefinition);
 }

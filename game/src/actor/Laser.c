@@ -66,7 +66,7 @@ static bool TripleLaserObjectLayerShouldCollide(const JPH_ObjectLayer layer)
 	return layer == OBJECT_LAYER_STATIC;
 }
 
-static bool BodyFilterShouldCollide(const JPH_BodyId bodyId)
+static bool BodyFilterShouldCollide(const JPH_BodyID bodyId)
 {
 	JPH_BodyInterface *bodyInterface = JPH_PhysicsSystem_GetBodyInterface(GetState()->map->physicsSystem);
 	const Actor *actor = (const Actor *)JPH_BodyInterface_GetUserData(bodyInterface, bodyId);
@@ -230,19 +230,20 @@ void LaserRaycastFiltersDestroy()
 	JPH_BodyFilter_Destroy(bodyFilter);
 }
 
-static ActorDefinition definition = {.actorType = ACTOR_TYPE_LASER,
-									 .Update = LaserUpdate,
-									 .OnPlayerContactAdded = DefaultActorOnPlayerContactAdded,
-									 .OnPlayerContactPersisted = DefaultActorOnPlayerContactPersisted,
-									 .OnPlayerContactRemoved = DefaultActorOnPlayerContactRemoved,
-									 .RenderUi = DefaultActorRenderUi,
-									 .Destroy = DefaultActorDestroy,
-									 .Init = LaserInit};
+ActorDefinition laserActorDefinition = {
+	.Update = LaserUpdate,
+	.OnPlayerContactAdded = DefaultActorOnPlayerContactAdded,
+	.OnPlayerContactPersisted = DefaultActorOnPlayerContactPersisted,
+	.OnPlayerContactRemoved = DefaultActorOnPlayerContactRemoved,
+	.RenderUi = DefaultActorRenderUi,
+	.Destroy = DefaultActorDestroy,
+	.Init = LaserInit,
+};
 
 void RegisterLaser()
 {
-	RegisterDefaultActorInputs(&definition);
-	RegisterActorInput(&definition, LASER_INPUT_TURN_ON, LaserTurnOnHandler);
-	RegisterActorInput(&definition, LASER_INPUT_TURN_OFF, LaserTurnOffHandler);
-	RegisterActor(LASER_ACTOR_NAME, &definition);
+	RegisterDefaultActorInputs(&laserActorDefinition);
+	RegisterActorInput(&laserActorDefinition, LASER_INPUT_TURN_ON, LaserTurnOnHandler);
+	RegisterActorInput(&laserActorDefinition, LASER_INPUT_TURN_OFF, LaserTurnOffHandler);
+	RegisterActor(LASER_ACTOR_NAME, &laserActorDefinition);
 }

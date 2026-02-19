@@ -2,8 +2,8 @@
 // Created by droc101 on 4/22/2024.
 //
 
-#ifndef LOBALSTATE_H
-#define LOBALSTATE_H
+#ifndef GLOBALSTATE_H
+#define GLOBALSTATE_H
 
 #include <engine/structs/Camera.h>
 #include <engine/structs/Item.h>
@@ -144,4 +144,4 @@ void DestroyGlobalState();
  */
 bool ChangeMapByName(const char *name);
 
-#endif //LOBALSTATE_H
+#endif //GLOBALSTATE_H

@@ -169,7 +169,7 @@ bool FrameStart()
 	switch (currentRenderer)
 	{
 		case RENDERER_VULKAN:
-			return VK_FrameStart() == VK_SUCCESS;
+			return VK_FrameStart();
 		case RENDERER_OPENGL:
 			return GL_FrameStart();
 		default:
@@ -291,7 +291,7 @@ void LoadMapModels(const Map *map)
 			GL_LoadMap(map);
 			break;
 		case RENDERER_VULKAN:
-			// TODO
+			VK_LoadMap(map);
 		default:
 			break;
 	}
