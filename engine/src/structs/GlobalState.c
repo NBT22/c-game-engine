@@ -158,7 +158,6 @@ void ChangeMap(Map *map)
 	}
 	state.map = map;
 	LoadMapModels(map);
-
 	PhysicsThreadUnlockTickMutex();
 }
 

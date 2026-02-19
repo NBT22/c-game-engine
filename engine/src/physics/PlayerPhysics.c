@@ -409,7 +409,7 @@ void UpdatePlayer(Player *player, const JPH_PhysicsSystem *physicsSystem, const 
 						(raycastResult.fraction * actorRaycastMaxDistance < 1.0f))
 					{
 						crosshairColor = CROSSHAIR_COLOR_HOLDABLE;
-						if (IsKeyJustPressedPhys(SDL_SCANCODE_E) || IsButtonJustPressedPhys(SDL_CONTROLLER_BUTTON_A))
+						if (IsKeyJustPressedPhys(SDL_SCANCODE_E) || IsButtonJustPressedPhys(SDL_GAMEPAD_BUTTON_SOUTH))
 						{
 							player->heldActor = player->targetedActor;
 							player->hasHeldActor = true;
