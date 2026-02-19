@@ -36,7 +36,7 @@ void InitDPrintConsole()
 #endif
 	{
 		consoleEnabled = true;
-		ListInit(consoleMessages, LIST_POINTER);
+		ListInit(consoleMessages, ConsoleMessage);
 	}
 }
 
@@ -47,10 +47,9 @@ void DestroyDPrintConsole()
 		consoleEnabled = false;
 		for (size_t i = 0; i < consoleMessages.length; i++)
 		{
-			const ConsoleMessage *msg = ListGetPointer(consoleMessages, i);
-			free(msg->message);
+			free(ListGet(consoleMessages, i, ConsoleMessage).message);
 		}
-		ListAndContentsFree(consoleMessages);
+		ListFree(consoleMessages);
 	}
 }
 
@@ -73,7 +72,7 @@ void ProcessDPrintConsole()
 	size_t indexToRemove = SIZE_MAX;
 	for (size_t i = 0; i < consoleMessages.length; i++)
 	{
-		ConsoleMessage *msg = ListGetPointer(consoleMessages, i);
+		ConsoleMessage *msg = &ListGet(consoleMessages, i, ConsoleMessage);
 		DPrint(msg->message, msg->color);
 		if (msg->time == 0)
 		{
@@ -85,9 +84,7 @@ void ProcessDPrintConsole()
 	}
 	if (indexToRemove != SIZE_MAX)
 	{
-		ConsoleMessage *msg = ListGetPointer(consoleMessages, indexToRemove);
-		free(msg->message);
-		free(msg);
+		free(ListGet(consoleMessages, indexToRemove, ConsoleMessage).message);
 		ListRemoveAt(consoleMessages, indexToRemove);
 	}
 }
