@@ -16,6 +16,7 @@
 #include <engine/structs/Player.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/joltc.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <limits.h>
@@ -41,7 +42,7 @@ Map *CreateMap(void)
 	map->changeFlags = 0;
 	ListInit(map->namedActorNames, const char *);
 	ListInit(map->namedActorPointers, Actor *);
-	ListInit(map->joltBodies, uint32_t);
+	ListInit(map->joltBodies, JPH_BodyID);
 
 	Item *item = GetItem();
 	if (item)

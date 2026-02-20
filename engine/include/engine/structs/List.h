@@ -38,8 +38,6 @@ struct SortedList
 	int (*CompareFunction)(const void *, const void *);
 };
 
-#define List()
-
 
 // NOLINTBEGIN(*-reserved-identifier)
 void _ListInit(List *list, size_t stride);

@@ -59,11 +59,11 @@ void AddConsoleMessage(const char *msg, const Color color)
 	{
 		return;
 	}
-	ConsoleMessage *cm = malloc(sizeof(ConsoleMessage));
-	CheckAlloc(cm);
-	cm->message = strdup(msg);
-	cm->color = color;
-	cm->time = 0; // time will be set when the message is first processed so a 2 second frame doesn't result in messages not getting shown
+	ConsoleMessage cm = {
+		.message = strdup(msg),
+		.color = color,
+		.time = 0, // time will be set when the message is first processed so a 2 second frame doesn't result in messages not getting shown
+	};
 	ListAdd(consoleMessages, cm);
 }
 
