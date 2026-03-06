@@ -310,7 +310,7 @@ bool CreateTextureSamplers()
 		default:
 			break;
 	}
-	maxAnisotropy = max(maxAnisotropy, physicalDeviceProperties.limits.maxSamplerAnisotropy);
+	maxAnisotropy = min(maxAnisotropy, physicalDeviceProperties.limits.maxSamplerAnisotropy);
 	const LunaSamplerCreationInfo linearRepeatSamplerAnisotropyCreateInfo = {
 		.magFilter = VK_FILTER_LINEAR,
 		.minFilter = VK_FILTER_LINEAR,
@@ -319,7 +319,7 @@ bool CreateTextureSamplers()
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.mipmapLodBias = -1.5f,
-		.anisotropyEnable = VK_TRUE,
+		.anisotropyEnable = maxAnisotropy == 0 ? VK_FALSE : VK_TRUE,
 		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
@@ -331,7 +331,7 @@ bool CreateTextureSamplers()
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.mipmapLodBias = -1.5f,
-		.anisotropyEnable = VK_TRUE,
+		.anisotropyEnable = maxAnisotropy == 0 ? VK_FALSE : VK_TRUE,
 		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
@@ -343,7 +343,7 @@ bool CreateTextureSamplers()
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipmapLodBias = -1.5f,
-		.anisotropyEnable = VK_TRUE,
+		.anisotropyEnable = maxAnisotropy == 0 ? VK_FALSE : VK_TRUE,
 		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
@@ -355,7 +355,7 @@ bool CreateTextureSamplers()
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.mipmapLodBias = -1.5f,
-		.anisotropyEnable = VK_TRUE,
+		.anisotropyEnable = maxAnisotropy == 0 ? VK_FALSE : VK_TRUE,
 		.maxAnisotropy = maxAnisotropy,
 		.maxLod = VK_LOD_CLAMP_NONE,
 	};
