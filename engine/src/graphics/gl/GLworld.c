@@ -22,7 +22,6 @@
 #include <engine/structs/Map.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
-#include <engine/subsystem/Logging.h>
 #include <joltc/joltc.h>
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/RMat44.h>
@@ -36,7 +35,7 @@
 
 void GL_DrawShadedActorWall(const Actor *actor, const mat4 actorXfm)
 {
-	const ActorWall *wall = actor->actorWall;
+	const ActorWall *wall = actor->wall;
 
 	GL_UseShader(actorWallShadedShader);
 
@@ -44,13 +43,16 @@ void GL_DrawShadedActorWall(const Actor *actor, const mat4 actorXfm)
 
 	glUniformMatrix4fv(actorWallShadedTransformMatrixLoc, 1, GL_FALSE, *actorXfm);
 
+	glUniform4fv(actorWallShadedAlbColorLoc, 1, COLOR_TO_ARR(actor->modColor));
+
 	GL_LoadTextureFromAsset(wall->tex);
 
 	const float halfHeight = wall->height / 2.0f;
 	const Vector2 startVertex = v2(wall->a.x, wall->a.y);
 	const Vector2 endVertex = v2(wall->b.x, wall->b.y);
-	const Vector2 startUV = v2(wall->uvOffset, 0);
-	const Vector2 endUV = v2(wall->uvScale * wall->length + wall->uvOffset, 1);
+	const Vector2 startUV = v2(wall->uvOffset.x, wall->uvOffset.y);
+	const Vector2 endUV = v2(wall->uvScale.x * wall->length + wall->uvOffset.x,
+							 wall->uvScale.y * wall->height + wall->uvOffset.y);
 	const float backfaceWallAngle = wall->angle + PIf;
 	const float vertices[8][6] = {
 		// X Y Z U V A
@@ -153,7 +155,7 @@ void GL_DrawShadedActorWall(const Actor *actor, const mat4 actorXfm)
 
 void GL_DrawUnshadedActorWall(const Actor *actor, const mat4 actorXfm)
 {
-	const ActorWall *wall = actor->actorWall;
+	const ActorWall *wall = actor->wall;
 
 	GL_UseShader(actorWallUnshadedShader);
 
@@ -161,13 +163,16 @@ void GL_DrawUnshadedActorWall(const Actor *actor, const mat4 actorXfm)
 
 	glUniformMatrix4fv(actorWallUnshadedTransformMatrixLoc, 1, GL_FALSE, *actorXfm);
 
+	glUniform4fv(actorWallUnshadedAlbColorLoc, 1, COLOR_TO_ARR(actor->modColor));
+
 	GL_LoadTextureFromAsset(wall->tex);
 
 	const float halfHeight = wall->height / 2.0f;
 	const Vector2 startVertex = v2(wall->a.x, wall->a.y);
 	const Vector2 endVertex = v2(wall->b.x, wall->b.y);
-	const Vector2 startUV = v2(wall->uvOffset, 0);
-	const Vector2 endUV = v2(wall->uvScale * wall->length + wall->uvOffset, 1);
+	const Vector2 startUV = v2(wall->uvOffset.x, wall->uvOffset.y);
+	const Vector2 endUV = v2(wall->uvScale.x * wall->length + wall->uvOffset.x,
+							 wall->uvScale.y * wall->height + wall->uvOffset.y);
 	const float vertices[8][5] = {
 		// X Y Z U V A
 		{
@@ -265,8 +270,11 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 
 	GL_SetMapParams(&worldViewMatrix, map);
 
-	GL_RenderModel(LoadModel(MODEL("sky")), skyModelWorldMatrix, 0, 0, COLOR_WHITE);
-	GL_ClearDepthOnly(); // prevent sky from clipping into walls
+	if (map->renderSky)
+	{
+		GL_RenderModel(LoadModel(MODEL("sky")), skyModelWorldMatrix, 0, 0, COLOR_WHITE);
+		GL_ClearDepthOnly(); // prevent sky from clipping into walls
+	}
 
 	for (size_t i = 0; i < GL_MAX_MAP_MODELS; i++)
 	{
@@ -287,7 +295,7 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 	for (size_t i = 0; i < map->actors.length; i++)
 	{
 		const Actor *actor = ListGet(map->actors, i, const Actor *);
-		if (!actor->actorWall && !actor->actorModel)
+		if (!actor->wall && !actor->model)
 		{
 			continue;
 		}
@@ -298,22 +306,22 @@ void GL_RenderMap(const Map *map, const Camera *camera)
 
 		mat4 actorXfm = GLM_MAT4_IDENTITY_INIT;
 		ActorTransformMatrix(actor, &actorXfm);
-		if (actor->actorModel == NULL)
+		if (actor->hasModel)
 		{
-			if (actor->actorWall == NULL)
+			GL_RenderModel(actor->model, actorXfm, actor->currentSkinIndex, actor->currentLod, actor->modColor);
+		} else
+		{
+			if (actor->wall == NULL)
 			{
 				continue;
 			}
-			if (actor->actorWall->unshaded)
+			if (actor->wall->unshaded)
 			{
 				GL_DrawUnshadedActorWall(actor, actorXfm);
 			} else
 			{
 				GL_DrawShadedActorWall(actor, actorXfm);
 			}
-		} else
-		{
-			GL_RenderModel(actor->actorModel, actorXfm, actor->currentSkinIndex, actor->currentLod, actor->modColor);
 		}
 	}
 	ListUnlock(map->actors);
@@ -502,7 +510,7 @@ void GL_RenderShadedMapModel(const GL_MapModelBuffer *model)
 
 	GL_LoadTextureFromAsset(model->mapModel->material->texture);
 
-	mat4 idty = GLM_MAT4_IDENTITY_INIT;
+	const mat4 idty = GLM_MAT4_IDENTITY_INIT;
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, shadedModelSharedUniformsLoc, sharedUniformBuffer);
 
@@ -546,7 +554,7 @@ void GL_RenderUnshadedMapModel(const GL_MapModelBuffer *model)
 
 	GL_LoadTextureFromAsset(model->mapModel->material->texture);
 
-	mat4 idty = GLM_MAT4_IDENTITY_INIT;
+	const mat4 idty = GLM_MAT4_IDENTITY_INIT;
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, unshadedModelSharedUniformsLoc, sharedUniformBuffer);
 
@@ -584,23 +592,25 @@ void GL_RenderUnshadedMapModel(const GL_MapModelBuffer *model)
 void GL_LoadMap(const Map *map)
 {
 	GL_DestroyMapModels();
-
-	for (size_t i = 0; i < map->modelCount; i++)
+	if (map)
 	{
-		GL_MapModelBuffer *mmb = malloc(sizeof(GL_MapModelBuffer));
-		CheckAlloc(mmb);
-		mapModels[i] = mmb;
-		mmb->mapModel = &map->models[i];
-		mmb->buffer = GL_ConstructBuffer();
-		GL_BindBuffer(mmb->buffer);
-		glBufferData(GL_ARRAY_BUFFER,
-					 (GLsizeiptr)(mmb->mapModel->vertexCount * sizeof(MapVertex)),
-					 mmb->mapModel->vertices,
-					 GL_STREAM_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-					 (GLsizeiptr)(mmb->mapModel->indexCount * sizeof(uint32_t)),
-					 mmb->mapModel->indices,
-					 GL_STREAM_DRAW);
+		for (size_t i = 0; i < map->modelCount; i++)
+		{
+			GL_MapModelBuffer *mmb = malloc(sizeof(GL_MapModelBuffer));
+			CheckAlloc(mmb);
+			mapModels[i] = mmb;
+			mmb->mapModel = &map->models[i];
+			mmb->buffer = GL_ConstructBuffer();
+			GL_BindBuffer(mmb->buffer);
+			glBufferData(GL_ARRAY_BUFFER,
+						 (GLsizeiptr)(mmb->mapModel->vertexCount * sizeof(MapVertex)),
+						 mmb->mapModel->vertices,
+						 GL_STREAM_DRAW);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+						 (GLsizeiptr)(mmb->mapModel->indexCount * sizeof(uint32_t)),
+						 mmb->mapModel->indices,
+						 GL_STREAM_DRAW);
+		}
 	}
 }
 

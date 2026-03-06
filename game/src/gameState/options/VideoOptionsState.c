@@ -18,7 +18,6 @@
 #include <engine/uiStack/controls/Slider.h>
 #include <engine/uiStack/UiStack.h>
 #include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -88,8 +87,7 @@ void RbOptionsRenderer(const bool /*value*/, const uint8_t /*groupId*/, const ui
 void CbOptionsVsync(const bool value)
 {
 	GetState()->options.vsync = value;
-	hasChangedVideoOptions = true;
-	// VSync change will happen on next restart
+	SetVsyncEnabled(GetState()->options.vsync);
 }
 
 void CbOptionsLimitFpsWhenUnfocused(const bool value)
@@ -100,8 +98,7 @@ void CbOptionsLimitFpsWhenUnfocused(const bool value)
 void CbOptionsMipmaps(const bool value)
 {
 	GetState()->options.mipmaps = value;
-	hasChangedVideoOptions = true;
-	// Mipmaps change will happen on next restart
+	rendererQueuedActions |= QUEUED_ACTION_CLEAR_ALL_TEXTURES;
 }
 
 void CbOptionsPreferWayland(const bool value)
@@ -114,15 +111,13 @@ void CbOptionsPreferWayland(const bool value)
 void SldOptionsMsaa(const float value)
 {
 	GetState()->options.msaa = value;
-	hasChangedVideoOptions = true;
-	// Change will happen next restart
+	rendererQueuedActions |= QUEUED_ACTION_RECREATE_FRAMEBUFFERS;
 }
 
 void SldOptionsAnisotropy(const float value)
 {
 	GetState()->options.anisotropy = value;
-	hasChangedVideoOptions = true;
-	// Change will happen next restart
+	rendererQueuedActions |= QUEUED_ACTION_CLEAR_ALL_TEXTURES;
 }
 
 void SldOptionsLod(const float value)
@@ -138,7 +133,8 @@ void SldOptionsFov(const float value)
 
 void VideoOptionsStateUpdate(GlobalState * /*state*/)
 {
-	if (IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || IsButtonJustPressed(CONTROLLER_CANCEL))
+	if (IsKeyJustPressed(mainThreadInput, SDL_SCANCODE_ESCAPE) ||
+		IsButtonJustPressed(mainThreadInput, CONTROLLER_CANCEL))
 	{
 		BtnVideoOptionsBack();
 	}

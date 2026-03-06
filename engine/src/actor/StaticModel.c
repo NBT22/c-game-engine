@@ -3,7 +3,6 @@
 //
 
 #include <engine/actor/StaticModel.h>
-#include <engine/assets/AssetReader.h>
 #include <engine/assets/ModelLoader.h>
 #include <engine/physics/Physics.h>
 #include <engine/structs/Actor.h>
@@ -18,28 +17,25 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 static inline void CreateStaticModelCollider(Actor *this, const Transform *transform, const bool useAABB)
 {
 	JPH_BodyCreationSettings *bodyCreationSettings = NULL;
 	if (!useAABB)
 	{
-		bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(this->actorModel->collisionModelShape,
+		bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(this->model->collisionModelShape,
 																	 transform,
 																	 JPH_MotionType_Static,
 																	 OBJECT_LAYER_STATIC,
 																	 this);
 	} else
 	{
-		bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(this->actorModel->boundingBoxShape,
+		bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(this->model->boundingBoxShape,
 																	 transform,
 																	 JPH_MotionType_Static,
 																	 OBJECT_LAYER_STATIC,
 																	 this);
-		this->actorFlags = ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION;
+		this->flags = ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION;
 	}
 	this->bodyId = JPH_BodyInterface_CreateAndAddBody(this->bodyInterface,
 													  bodyCreationSettings,
@@ -49,11 +45,12 @@ static inline void CreateStaticModelCollider(Actor *this, const Transform *trans
 
 void StaticModelInit(Actor *this, const KvList params, Transform *transform)
 {
-	this->actorModel = LoadModel(KvGetString(params, "model", "leafy"));
+	this->hasModel = true;
+	this->model = LoadModel(KvGetString(params, "model", "model/quad.gmdl"));
 	this->currentSkinIndex = KvGetInt(params, "skin", 0);
 	this->modColor = KvGetColor(params, "color", COLOR_WHITE);
 	uint8_t collisionType = KvGetByte(params, "collision", 2);
-	if (collisionType == 2 && this->actorModel->collisionModelType == COLLISION_MODEL_TYPE_NONE)
+	if (collisionType == 2 && this->model->collisionModelType == COLLISION_MODEL_TYPE_NONE)
 	{
 		LogWarning("Tried to create a " STATIC_MODEL_ACTOR_NAME
 				   " with full collision, but the model file (\"%s\") does not have any!\n",

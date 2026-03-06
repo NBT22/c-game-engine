@@ -1,10 +1,12 @@
 name: Windows Build
 
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+  workflow_call:
+    inputs:
+      buildForDistribution:
+        description: "Build all four x86 ABI versions"
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       buildForDistribution:
@@ -44,7 +46,6 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-cglm
           update: true
 
       - name: Convert github.workspace to mingw path

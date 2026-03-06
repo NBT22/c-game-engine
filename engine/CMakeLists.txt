@@ -12,9 +12,8 @@ detect_platform()
 set(BUILD_SHARED_LIBS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out/bin) # TODO SDL3 seems to put its DLLs in the RUNTIME output dir for some reason
 disable_options(SDL_GPU_DEFAULT SDL_RENDER_DEFAULT SDL_CAMERA_DEFAULT SDL_HIDAPI_DEFAULT SDL_POWER_DEFAULT
-        SDL_SENSOR_DEFAULT SDL_DIALOG_DEFAULT SDL_TRAY_DEFAULT SDL_AVX SDL_AVX2 SDL_AVX512F SDL_SSE3
-        SDL_SSE4_1 SDL_SSE4_2 SDL_DISKAUDIO SDL_DUMMYAUDIO SDL_DUMMYVIDEO SDL_OPENGLES SDL_DIRECTX
-        SDL_VIVANTE SDL_OFFSCREEN SDL_DUMMYCAMERA SDL_HIDAPI SDL_VIRTUAL_JOYSTICK SDL_KMSDRM)
+        SDL_SENSOR_DEFAULT SDL_DIALOG_DEFAULT SDL_TRAY_DEFAULT SDL_DISKAUDIO SDL_DUMMYAUDIO SDL_DUMMYVIDEO SDL_OPENGLES
+        SDL_DIRECTX SDL_VIVANTE SDL_OFFSCREEN SDL_DUMMYCAMERA SDL_HIDAPI SDL_VIRTUAL_JOYSTICK SDL_KMSDRM)
 enable_options(SDL_CCACHE)
 fetch_package_tag(https://github.com/libsdl-org/SDL.git release-3.*.* SDL3)
 
@@ -51,7 +50,7 @@ if (JOLT_BUILD_TYPE_RELWITHDEBINFO AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(JPH_BUILD_TYPE RelWithDebInfo)
 endif ()
 message(STATUS "Fetching JoltC/Jolt...")
-fetch_package(https://github.com/NBT22/joltc main joltc)
+fetch_package(https://github.com/NBT22/joltc 226bd1e0afa8552917ffd56bca03ccb5c14ecd27 joltc)
 
 #endregion
 
@@ -78,6 +77,8 @@ target_sources(engine INTERFACE
         include/engine/actor/GlobalLight.h
         src/actor/GlobalFog.c
         include/engine/actor/GlobalFog.h
+        include/engine/actor/PhysicsModel.h
+        src/actor/PhysicsModel.c
 
         src/assets/AssetReader.c
         include/engine/assets/AssetReader.h
@@ -258,3 +259,14 @@ if (UNIX)
 elseif (WIN32)
     target_link_libraries(engine INTERFACE opengl32 dwmapi)
 endif ()
+
+file(WRITE ${CMAKE_BINARY_DIR}/generated/include/engine/Commit.h)
+
+add_custom_target(
+        generate_commit_header ALL
+        COMMAND ${CMAKE_COMMAND} -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/Commit.h.in -DOUT_FILE=${CMAKE_BINARY_DIR}/generated/include/engine/Commit.h -DREPO_DIR=${CMAKE_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateCommitHashes.cmake
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/include/engine/Commit.h
+)
+add_dependencies(engine generate_commit_header)
+target_include_directories(engine INTERFACE ${CMAKE_BINARY_DIR}/generated/include/)

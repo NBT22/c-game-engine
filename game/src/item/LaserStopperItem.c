@@ -10,6 +10,7 @@
 #include <engine/structs/KVList.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Player.h>
+#include <engine/structs/Viewmodel.h>
 #include <engine/subsystem/Input.h>
 #include <item/LaserStopperItem.h>
 #include <SDL3/SDL_gamepad.h>
@@ -23,7 +24,10 @@ static void LaserStopperItemSwitchFunction(Item *this, Viewmodel *viewmodel)
 	viewmodel->enabled = false;
 }
 
-static bool LaserStopperItemCanTargetFunction(Item *this, Actor *targetedActor, Color *crosshairColor, double delta)
+static bool LaserStopperItemCanTargetFunction(Item *this,
+											  Actor *targetedActor,
+											  Color *crosshairColor,
+											  const double delta)
 {
 	(void)this;
 	(void)delta;
@@ -31,11 +35,13 @@ static bool LaserStopperItemCanTargetFunction(Item *this, Actor *targetedActor, 
 	{
 		*crosshairColor = CROSSHAIR_COLOR_ENEMY;
 
-		if (IsMouseButtonJustPressedPhys(SDL_BUTTON_LEFT) || IsButtonJustPressedPhys(SDL_GAMEPAD_BUTTON_WEST))
+		if (IsMouseButtonJustPressed(physicsThreadInput, SDL_BUTTON_LEFT) ||
+			IsButtonJustPressed(physicsThreadInput, SDL_GAMEPAD_BUTTON_WEST))
 		{
 			const GlobalState *state = GetState();
 			ActorTriggerInput(NULL, state->map->player.targetedActor, LASER_EMITTER_INPUT_TURN_OFF, &PARAM_NONE);
-		} else if (IsMouseButtonJustPressedPhys(SDL_BUTTON_RIGHT) || IsButtonJustPressedPhys(SDL_GAMEPAD_BUTTON_NORTH))
+		} else if (IsMouseButtonJustPressed(physicsThreadInput, SDL_BUTTON_RIGHT) ||
+				   IsButtonJustPressed(physicsThreadInput, SDL_GAMEPAD_BUTTON_NORTH))
 		{
 			const GlobalState *state = GetState();
 			ActorTriggerInput(NULL, state->map->player.targetedActor, LASER_EMITTER_INPUT_TURN_ON, &PARAM_NONE);

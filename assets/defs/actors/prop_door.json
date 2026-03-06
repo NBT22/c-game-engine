@@ -35,6 +35,53 @@
       "description": "Whether this door should open when the player approaches",
       "default": false,
       "type": "bool"
+    },
+    "size": {
+      "display": "Size",
+      "type": "vec2",
+      "default_x": 1.0,
+      "default_y": 1.0,
+      "description": "The in-game size of the door"
+    },
+    "uv_scale": {
+      "display": "UV Scale",
+      "type": "vec2",
+      "default_x": 1.0,
+      "default_y": 1.0,
+      "description": "The UV scale factor"
+    },
+    "uv_offset": {
+      "display": "UV Offset",
+      "type": "vec2",
+      "default_x": 0.0,
+      "default_y": 0.0,
+      "description": "The UV offset"
+    },
+    "texture": {
+      "display": "Texture",
+      "default": "texture/actor/door.gtex",
+      "type": "string",
+      "string_hint": "texture",
+      "description": "The texture of the door"
+    },
+    "unshaded": {
+      "display": "Unshaded",
+      "default": false,
+      "type": "bool",
+      "description": "Whether or not the door should be rendered without shading (glowing)"
+    },
+    "delay_until_close": {
+      "display": "Delay until close",
+      "default": 1.0,
+      "type": "float",
+      "minimum": 0.0,
+      "description": "How long the door will stay open. Ignored if \"Stay Open\" is set."
+    },
+    "color": {
+      "display": "Tint Color",
+      "default": -1,
+      "type": "color",
+      "description": "The tint color of this door"
     }
   }
 }

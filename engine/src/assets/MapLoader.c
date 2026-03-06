@@ -2,11 +2,13 @@
 // Created by droc101 on 4/21/2024.
 //
 
+#include <assert.h>
 #include <engine/assets/AssetReader.h>
 #include <engine/assets/DataReader.h>
 #include <engine/assets/MapLoader.h>
 #include <engine/assets/MapMaterialLoader.h>
 #include <engine/assets/ModelLoader.h>
+#include <engine/graphics/RenderingHelpers.h>
 #include <engine/physics/Physics.h>
 #include <engine/physics/PlayerPhysics.h>
 #include <engine/structs/Actor.h>
@@ -24,9 +26,9 @@
 #include <joltc/Math/Transform.h>
 #include <joltc/Math/Vector3.h>
 #include <joltc/Physics/Body/BodyCreationSettings.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
-#include <joltc/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -34,21 +36,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "actor/TestActor.h"
-
-Map *LoadMap(const char *path)
+bool LoadMap(Map *map, Asset *mapData)
 {
-	Map *map = CreateMap();
-	Asset *mapData = DecompressAsset(path, false);
 	size_t offset = 0;
 	size_t bytesRemaining = mapData->size;
 	size_t strLength = 0;
 
 	JPH_BodyInterface *bodyInterface = JPH_PhysicsSystem_GetBodyInterface(map->physicsSystem);
 
-	map->skyTexture = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
-	bytesRemaining -= strLength;
-	bytesRemaining += sizeof(size_t);
+	EXPECT_BYTES_BOOL(1, bytesRemaining);
+	map->renderSky = ReadByte(mapData->data, &offset);
+	if (map->renderSky)
+	{
+		map->skyTexture = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
+		bytesRemaining -= strLength;
+		bytesRemaining += sizeof(size_t);
+	} else
+	{
+		map->skyTexture = NULL;
+	}
 	map->discordRpcIcon = ReadStringSafe(mapData->data, &offset, mapData->size, &strLength);
 	bytesRemaining -= strLength;
 	bytesRemaining += sizeof(size_t);
@@ -56,7 +62,7 @@ Map *LoadMap(const char *path)
 	bytesRemaining -= strLength;
 	bytesRemaining += sizeof(size_t);
 
-	EXPECT_BYTES(sizeof(size_t), bytesRemaining);
+	EXPECT_BYTES_BOOL(sizeof(size_t), bytesRemaining);
 	const size_t numActors = ReadSizeT(mapData->data, &offset);
 	for (size_t i = 0; i < numActors; i++)
 	{
@@ -65,7 +71,7 @@ Map *LoadMap(const char *path)
 		bytesRemaining -= actorClassLength;
 		bytesRemaining -= sizeof(size_t);
 
-		EXPECT_BYTES(sizeof(float) * 6, bytesRemaining);
+		EXPECT_BYTES_BOOL(sizeof(float) * 6, bytesRemaining);
 		Transform xfm;
 		xfm.position.x = ReadFloat(mapData->data, &offset);
 		xfm.position.y = ReadFloat(mapData->data, &offset);
@@ -78,7 +84,7 @@ Map *LoadMap(const char *path)
 
 		LockingList ioConnections;
 		ListInit(ioConnections, ActorConnection);
-		EXPECT_BYTES(sizeof(size_t), bytesRemaining);
+		EXPECT_BYTES_BOOL(sizeof(size_t), bytesRemaining);
 		const size_t numConnections = ReadSizeT(mapData->data, &offset);
 		for (size_t j = 0; j < numConnections; j++)
 		{
@@ -94,8 +100,14 @@ Map *LoadMap(const char *path)
 			bytesRemaining += sizeof(size_t);
 			uint8_t hasOverride = ReadByte(mapData->data, &offset);
 			// TODO data size validation for params
-			size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection.outParamOverride);
-			bytesRemaining -= paramSize;
+			if (hasOverride)
+			{
+				size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection->outParamOverride);
+				bytesRemaining -= paramSize;
+			} else
+			{
+				connection.outParamOverride.type = PARAM_TYPE_NONE;
+			}
 			connection.numRefires = ReadSizeT(mapData->data, &offset);
 			ListAdd(ioConnections, connection);
 		}
@@ -138,7 +150,7 @@ Map *LoadMap(const char *path)
 		}
 	}
 
-	EXPECT_BYTES(sizeof(size_t), bytesRemaining);
+	EXPECT_BYTES_BOOL(sizeof(size_t), bytesRemaining);
 	map->modelCount = ReadSizeT(mapData->data, &offset);
 	map->models = malloc(sizeof(MapModel) * map->modelCount);
 	CheckAlloc(map->models);
@@ -149,16 +161,17 @@ Map *LoadMap(const char *path)
 		bytesRemaining -= sizeof(size_t);
 		bytesRemaining -= strLength;
 		model->material = LoadMapMaterial(materialName);
+		assert(model->material);
 		free(materialName);
 
-		EXPECT_BYTES(sizeof(uint32_t), bytesRemaining);
+		EXPECT_BYTES_BOOL(sizeof(uint32_t), bytesRemaining);
 		model->vertexCount = ReadUint(mapData->data, &offset);
 		model->vertices = malloc(sizeof(MapVertex) * model->vertexCount);
 		CheckAlloc(model->vertices);
 		for (uint32_t j = 0; j < model->vertexCount; j++)
 		{
 			MapVertex *vertex = model->vertices + j;
-			EXPECT_BYTES(sizeof(float) * 12, bytesRemaining);
+			EXPECT_BYTES_BOOL(sizeof(float) * 12, bytesRemaining);
 			vertex->position.x = ReadFloat(mapData->data, &offset);
 			vertex->position.y = ReadFloat(mapData->data, &offset);
 			vertex->position.z = ReadFloat(mapData->data, &offset);
@@ -172,9 +185,9 @@ Map *LoadMap(const char *path)
 			vertex->normal.y = ReadFloat(mapData->data, &offset);
 			vertex->normal.z = ReadFloat(mapData->data, &offset);
 		}
-		EXPECT_BYTES(sizeof(uint32_t), bytesRemaining);
+		EXPECT_BYTES_BOOL(sizeof(uint32_t), bytesRemaining);
 		model->indexCount = ReadUint(mapData->data, &offset);
-		EXPECT_BYTES(sizeof(uint32_t) * model->indexCount, bytesRemaining);
+		EXPECT_BYTES_BOOL(sizeof(uint32_t) * model->indexCount, bytesRemaining);
 		model->indices = malloc(sizeof(uint32_t) * model->indexCount);
 		CheckAlloc(model->indices);
 		ReadBytes(mapData->data, &offset, sizeof(uint32_t) * model->indexCount, model->indices);
@@ -185,11 +198,11 @@ Map *LoadMap(const char *path)
 		.rotation = JPH_Quat_Identity,
 	};
 
-	EXPECT_BYTES(sizeof(size_t), bytesRemaining);
+	EXPECT_BYTES_BOOL(sizeof(size_t), bytesRemaining);
 	const size_t numCollisionMeshes = ReadSizeT(mapData->data, &offset);
 	for (size_t i = 0; i < numCollisionMeshes; i++)
 	{
-		EXPECT_BYTES((sizeof(float) * 3) + sizeof(size_t), bytesRemaining);
+		EXPECT_BYTES_BOOL((sizeof(float) * 3) + sizeof(size_t), bytesRemaining);
 		collisionXfm.position.x = ReadFloat(mapData->data, &offset);
 		collisionXfm.position.y = ReadFloat(mapData->data, &offset);
 		collisionXfm.position.z = ReadFloat(mapData->data, &offset);
@@ -204,7 +217,7 @@ Map *LoadMap(const char *path)
 		for (size_t j = 0; j < subShapeCount; j++)
 		{
 			ModelStaticCollider staticCollider;
-			EXPECT_BYTES(sizeof(size_t), bytesRemaining);
+			EXPECT_BYTES_BOOL(sizeof(size_t), bytesRemaining);
 			staticCollider.numTriangles = ReadSizeT(mapData->data, &offset);
 			staticCollider.tris = malloc(sizeof(JPH_Triangle) * staticCollider.numTriangles);
 			CheckAlloc(staticCollider.tris);
@@ -212,7 +225,7 @@ Map *LoadMap(const char *path)
 			{
 				JPH_Triangle *triangle = &staticCollider.tris[k];
 				triangle->materialIndex = 0;
-				EXPECT_BYTES(sizeof(float) * 9, bytesRemaining);
+				EXPECT_BYTES_BOOL(sizeof(float) * 9, bytesRemaining);
 
 				triangle->v1.x = ReadFloat(mapData->data, &offset);
 				triangle->v1.y = ReadFloat(mapData->data, &offset);
@@ -257,6 +270,8 @@ Map *LoadMap(const char *path)
 	JPH_PhysicsSystem_OptimizeBroadPhase(map->physicsSystem);
 
 	FreeAsset(mapData);
+
+	LoadMapModels(map);
 
 	return map;
 }

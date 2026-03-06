@@ -6,16 +6,21 @@
 #include <engine/graphics/gl/GLobjects.h>
 #include <engine/graphics/gl/GLshaders.h>
 #include <engine/structs/Color.h>
+#include <engine/subsystem/Error.h>
 #include <engine/subsystem/Logging.h>
 #include <GL/glew.h>
+#include <joltc/Math/Vector3.h>
 #include <signal.h>
 #include <stddef.h>
-#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define BREAK_ON_ERROR
 
-GL_DebugLine glDebugLines[GL_MAX_DEBUG_LINES_PER_FRAME];
+#define GL_DEBUG_LINES_BUFFER_RESIZE_INCREMENT 8192
+
+GL_DebugLine *glDebugLines = NULL;
+size_t debugLinesCapacity = 0;
 size_t numDebugLines = 0;
 
 void GL_DebugMessageCallback(const GLenum source,
@@ -131,7 +136,30 @@ void GL_DebugMessageCallback(const GLenum source,
 #endif
 }
 
-void GL_DrawDebugLine(GL_DebugLine *line)
+void GL_AddDebugLine(const Vector3 start, const Vector3 end, const Color color)
+{
+	if (numDebugLines >= debugLinesCapacity)
+	{
+		LogDebug("Resizing GL debug lines buffer from %zu to %zu\n",
+				 debugLinesCapacity,
+				 debugLinesCapacity + GL_DEBUG_LINES_BUFFER_RESIZE_INCREMENT);
+		void *newAlloc = realloc(glDebugLines,
+								 sizeof(GL_DebugLine) * (debugLinesCapacity + GL_DEBUG_LINES_BUFFER_RESIZE_INCREMENT));
+		CheckAlloc(newAlloc);
+		glDebugLines = newAlloc;
+		debugLinesCapacity += GL_DEBUG_LINES_BUFFER_RESIZE_INCREMENT;
+	}
+	const Vector3 colorVec = {color.r, color.g, color.b};
+
+	GL_DebugLine *line = &glDebugLines[numDebugLines];
+	line->start = start;
+	line->startColor = colorVec;
+	line->end = end;
+	line->endColor = colorVec;
+	numDebugLines++;
+}
+
+void GL_DrawDebugLines()
 {
 	glDisable(GL_LINE_SMOOTH);
 
@@ -139,49 +167,18 @@ void GL_DrawDebugLine(GL_DebugLine *line)
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, debugSharedUniformsLoc, sharedUniformBuffer);
 
-	glUniform4fv(debugColorLoc, 1, COLOR_TO_ARR(line->color));
-
-	// Calculate the 2 corner vertices of each point for a thick line
-	const float vertices[2][3] = {
-		{line->start.x, line->start.y, line->start.z},
-		{line->end.x, line->end.y, line->end.z},
-	};
-
-	const uint32_t indices[] = {0, 1};
+	const GLsizeiptr linesBufferSize = (GLsizeiptr)(sizeof(GL_DebugLine) * numDebugLines);
 
 	glBindBuffer(GL_ARRAY_BUFFER, glBuffer->vertexBufferObject);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, linesBufferSize, glDebugLines, GL_STREAM_DRAW);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->elementBufferObject);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STREAM_DRAW);
-
-	glVertexAttribPointer(debugVertexLoc, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void *)0);
+	glVertexAttribPointer(debugVertexLoc, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void *)0);
 	glEnableVertexAttribArray(debugVertexLoc);
+	glVertexAttribPointer(debugColorLoc, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void *)(3 * sizeof(float)));
+	glEnableVertexAttribArray(debugColorLoc);
 
 	glLineWidth(2.0f);
-	glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT, NULL);
-}
-
-void GL_AddDebugLine(const Vector3 start, const Vector3 end, const Color color)
-{
-	if (numDebugLines >= GL_MAX_DEBUG_LINES_PER_FRAME)
-	{
-		LogError("Tried to add a GL debug line, but there were no free slots!\n");
-		return;
-	}
-	GL_DebugLine *line = &glDebugLines[numDebugLines];
-	line->start = start;
-	line->end = end;
-	line->color = color;
-	numDebugLines++;
-}
-
-void GL_DrawDebugLines()
-{
-	for (size_t i = 0; i < numDebugLines; i++)
-	{
-		GL_DrawDebugLine(&glDebugLines[i]);
-	}
+	glDrawArrays(GL_LINES, 0, (GLsizei)numDebugLines * 2);
 }
 
 void GL_ResetDebugLines()

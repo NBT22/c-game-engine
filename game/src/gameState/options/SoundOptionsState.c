@@ -15,7 +15,7 @@
 #include <engine/uiStack/controls/Slider.h>
 #include <engine/uiStack/UiStack.h>
 #include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_stdinc.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "gameState/OptionsState.h"
@@ -53,7 +53,8 @@ void SldOptionsUiVolume(const float value)
 
 void SoundOptionsStateUpdate(GlobalState * /*state*/)
 {
-	if (IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || IsButtonJustPressed(CONTROLLER_CANCEL))
+	if (IsKeyJustPressed(mainThreadInput, SDL_SCANCODE_ESCAPE) ||
+		IsButtonJustPressed(mainThreadInput, CONTROLLER_CANCEL))
 	{
 		BtnSoundOptionsBack();
 	}

@@ -3,36 +3,34 @@
   "extends": "actor",
   "display": {
     "color": -1,
+    "color_param": "color",
     "texture_param": "texture"
   },
   "params": {
-    "width": {
-      "display": "Width",
-      "default": 1.0,
-      "type": "float",
-      "description": "The in-game width of the sprite"
+    "size": {
+      "display": "Size",
+      "type": "vec2",
+      "default_x": 1.0,
+      "default_y": 1.0,
+      "description": "The in-game size of the sprite"
     },
-    "height": {
-      "display": "Height",
-      "default": 1.0,
-      "type": "float",
-      "description": "The in-game height of the sprite"
-    },
-    "uvScale": {
+    "uv_scale": {
       "display": "UV Scale",
-      "default": 1.0,
-      "type": "float",
-      "description": "The horizontal UV scale factor"
+      "type": "vec2",
+      "default_x": 1.0,
+      "default_y": 1.0,
+      "description": "The UV scale factor"
     },
-    "uvOffset": {
+    "uv_offset": {
       "display": "UV Offset",
-      "default": 0.0,
-      "type": "float",
-      "description": "The horizontal UV offset"
+      "type": "vec2",
+      "default_x": 0.0,
+      "default_y": 0.0,
+      "description": "The UV offset"
     },
     "texture": {
       "display": "Texture",
-      "default": "level/uvtest",
+      "default": "texture/level/uvtest.gtex",
       "type": "string",
       "string_hint": "texture",
       "description": "The texture of the sprite"
@@ -48,6 +46,12 @@
       "default": false,
       "type": "bool",
       "description": "Whether or not the sprite have solid collision"
+    },
+    "color": {
+      "display": "Tint Color",
+      "default": -1,
+      "type": "color",
+      "description": "The tint color of this sprite"
     }
   }
 }

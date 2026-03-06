@@ -24,7 +24,7 @@ void ExecuteCommand(const char *command)
 	}
 	free(rwCommand);
 
-	const char *commandName = ListGet(commandList, 0, const char *);
+	// const char *commandName = ListGet(commandList, 0, const char *);
 	// TODO: Reimplement
 	// if (strcmp(commandName, "level") == 0)
 	// {

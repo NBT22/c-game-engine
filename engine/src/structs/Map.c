@@ -11,6 +11,7 @@
 #include <engine/structs/Color.h>
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/Item.h>
+#include <engine/structs/KVList.h>
 #include <engine/structs/List.h>
 #include <engine/structs/Map.h>
 #include <engine/structs/Player.h>
@@ -38,8 +39,6 @@ Map *CreateMap(void)
 	map->fogStart = 2000;
 	map->fogEnd = 2500;
 	map->lightColor = COLOR_WHITE;
-	map->physicsTick = 0;
-	map->changeFlags = 0;
 	ListInit(map->namedActorNames, const char *);
 	ListInit(map->namedActorPointers, Actor *);
 	ListInit(map->joltBodies, JPH_BodyID);

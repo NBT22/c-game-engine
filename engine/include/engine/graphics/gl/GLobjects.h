@@ -85,8 +85,9 @@ struct GL_SharedUniforms
 struct GL_DebugLine
 {
 	Vector3 start;
+	Vector3 startColor;
 	Vector3 end;
-	Color color;
+	Vector3 endColor;
 };
 
 /// Loaded textures
@@ -112,6 +113,8 @@ extern GLfloat anisotropyLevel;
 
 /// Number of MSAA samples
 extern GLint glMsaaSamples;
+
+void GL_UpdateAnisotropyLevel();
 
 /**
  * Create a shader program from assets
@@ -193,5 +196,7 @@ void GL_InitObjects();
  * Destroy GL objects
  */
 void GL_DestroyObjects();
+
+void GL_DeleteAllTextures();
 
 #endif //GAME_GLOBJECTS_H

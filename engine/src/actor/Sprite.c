@@ -3,11 +3,11 @@
 //
 
 #include <engine/actor/Sprite.h>
-#include <engine/assets/AssetReader.h>
 #include <engine/physics/Physics.h>
 #include <engine/structs/Actor.h>
 #include <engine/structs/ActorDefinition.h>
 #include <engine/structs/ActorWall.h>
+#include <engine/structs/Color.h>
 #include <engine/structs/KVList.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
@@ -18,13 +18,12 @@
 #include <joltc/Physics/Body/MassProperties.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static inline void CreateSpriteCollider(Actor *this, const Transform *transform)
 {
-	JPH_Shape *shape = ActorWallCreateCollider(this->actorWall);
+	JPH_Shape *shape = ActorWallCreateCollider(this->wall);
 	JPH_BodyCreationSettings *bodyCreationSettings = JPH_BodyCreationSettings_Create2_GAME(shape,
 																						   transform,
 																						   JPH_MotionType_Kinematic,
@@ -45,16 +44,17 @@ static inline void CreateSpriteCollider(Actor *this, const Transform *transform)
 
 void SpriteInit(Actor *this, const KvList params, Transform *transform)
 {
-	const float halfWidth = KvGetFloat(params, "width", 1.0f) * 0.5f;
-	this->actorWall = malloc(sizeof(ActorWall));
-	CheckAlloc(this->actorWall);
-	this->actorWall->a = v2(halfWidth, 0.0f);
-	this->actorWall->b = v2(-halfWidth, 0.0f);
-	this->actorWall->tex = strdup(KvGetString(params, "texture", "level/uvtest"));
-	this->actorWall->uvScale = KvGetFloat(params, "uvScale", 1.0f);
-	this->actorWall->uvOffset = KvGetFloat(params, "uvOffset", 0.0f);
-	this->actorWall->height = KvGetFloat(params, "height", 1.0f);
-	this->actorWall->unshaded = KvGetBool(params, "unshaded", false);
+	const Vector2 size = KvGetVec2(params, "size", v2s(1.0f));
+	this->wall = malloc(sizeof(ActorWall));
+	CheckAlloc(this->wall);
+	this->wall->a = v2(size.x * 0.5f, 0.0f);
+	this->wall->b = v2(-size.x * 0.5f, 0.0f);
+	this->wall->height = size.y;
+	this->wall->tex = strdup(KvGetString(params, "texture", "level/uvtest"));
+	this->wall->uvScale = KvGetVec2(params, "uv_scale", v2s(1.0f));
+	this->wall->uvOffset = KvGetVec2(params, "uv_offset", v2s(0.0f));
+	this->wall->unshaded = KvGetBool(params, "unshaded", false);
+	this->modColor = KvGetColor(params, "color", COLOR_WHITE);
 	if (KvGetBool(params, "solid", false))
 	{
 		CreateSpriteCollider(this, transform);

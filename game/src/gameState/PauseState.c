@@ -18,7 +18,6 @@
 #include <engine/uiStack/UiStack.h>
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_stdinc.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include "gameState/MainState.h"
@@ -33,16 +32,15 @@ UiStack *pauseStack = NULL;
 
 void PauseStateUpdate(GlobalState * /*state*/)
 {
-	if (IsKeyJustPressed(SDL_SCANCODE_ESCAPE) ||
-		IsButtonJustPressed(CONTROLLER_CANCEL) ||
-		IsButtonJustPressed(SDL_GAMEPAD_BUTTON_START))
+	if (IsKeyJustPressed(mainThreadInput, SDL_SCANCODE_ESCAPE) ||
+		IsButtonJustPressed(mainThreadInput, CONTROLLER_CANCEL) ||
+		IsButtonJustPressed(mainThreadInput, SDL_GAMEPAD_BUTTON_START))
 	{
 		(void)PlaySound(SOUND("sfx/popdown"), SOUND_CATEGORY_UI);
 		MainStateSet();
 	}
 }
 
-// ReSharper disable once CppParameterMayBeConstPtrOrRef
 void PauseStateRender(GlobalState * /*state*/)
 {
 	RenderInGameMenuBackground();
@@ -75,6 +73,7 @@ void BtnOptions()
 
 void BtnPauseExit()
 {
+	ChangeMap(NULL);
 #ifdef USE_LEVEL_SELECT
 	LevelSelectStateSet();
 #else

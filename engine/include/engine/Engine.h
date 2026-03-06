@@ -5,6 +5,7 @@
 #ifndef GAME_ENGINE_H
 #define GAME_ENGINE_H
 
+#include <engine/Commit.h>
 #include <engine/structs/ActorDefinition.h>
 #include <stdbool.h>
 
@@ -14,10 +15,11 @@
 #define ENGINE_VERSION_MAJOR 0
 #define ENGINE_VERSION_MINOR 0
 #define ENGINE_VERSION_PATCH 1
-#define ENGINE_VERSION_SUFFIX "-luna-sdl3"
+#define ENGINE_VERSION_SUFFIX "-luna"
 #define ENGINE_VERSION \
 	TO_STR(ENGINE_VERSION_MAJOR) \
-	"." TO_STR(ENGINE_VERSION_MINOR) "." TO_STR(ENGINE_VERSION_PATCH) ENGINE_VERSION_SUFFIX "-" CPU_TYPE
+	"." TO_STR(ENGINE_VERSION_MINOR) "." TO_STR(ENGINE_VERSION_PATCH) ENGINE_VERSION_SUFFIX \
+			"-" CPU_TYPE " (" ENGINE_GIT_SHORT_HASH ")"
 
 #ifdef WIN32
 /// Make this symbol exported (in the symbol table)

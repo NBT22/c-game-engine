@@ -16,11 +16,12 @@
 #include <engine/structs/Color.h>
 #include <engine/structs/GlobalState.h>
 #include <engine/structs/Map.h>
+#include <engine/structs/Options.h>
 #include <engine/structs/Vector2.h>
 #include <engine/subsystem/Error.h>
 #include <engine/subsystem/Logging.h>
-#include <joltc/constants.h>
 #include <joltc/Math/RMat44.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <SDL3/SDL_video.h>
 #include <stdbool.h>
@@ -35,6 +36,9 @@ bool windowFocused;
 SDL_Window *window;
 int windowWidth;
 int windowHeight;
+
+RendererQueuedAction rendererQueuedActions = 0;
+OptionsMsaa qaNewFrameufferMsaaValue = MSAA_NONE;
 
 void SetGameWindow(SDL_Window *w)
 {
@@ -73,19 +77,19 @@ inline void UpdateWindowSize()
 	windowHeight = (int)(windowHeight / GetState()->uiScale);
 }
 
-inline Vector2 ActualWindowSizeIgnoreDPI()
-{
-	int w = 0;
-	int h = 0;
-	SDL_GetWindowSizeInPixels(window, &w, &h);
-	return v2((float)w, (float)h);
-}
-
 inline Vector2 ActualWindowSize()
 {
 	int w = 0;
 	int h = 0;
 	SDL_GetWindowSize(window, &w, &h);
+	return v2((float)w, (float)h);
+}
+
+inline Vector2 ActualWindowSizeIgnoreDPI()
+{
+	int w = 0;
+	int h = 0;
+	SDL_GetWindowSizeInPixels(window, &w, &h);
 	return v2((float)w, (float)h);
 }
 
@@ -107,13 +111,13 @@ void ActorTransformMatrix(const Actor *actor, mat4 *transformMatrix)
 		JPH_RMat44 matrix;
 		JPH_BodyInterface_GetWorldTransform(actor->bodyInterface, actor->bodyId, &matrix);
 		memcpy(*transformMatrix, &matrix, sizeof(mat4));
-		if (actor->actorModel != NULL &&
-			(actor->actorFlags & ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION) == ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION)
+		if (actor->model != NULL &&
+			(actor->flags & ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION) == ACTOR_FLAG_USING_BOUNDING_BOX_COLLISION)
 		{
 			glm_translate(*transformMatrix,
-						  (vec3){-actor->actorModel->boundingBoxOrigin.x,
-								 -actor->actorModel->boundingBoxOrigin.y,
-								 -actor->actorModel->boundingBoxOrigin.z});
+						  (vec3){-actor->model->boundingBoxOrigin.x,
+								 -actor->model->boundingBoxOrigin.y,
+								 -actor->model->boundingBoxOrigin.z});
 		}
 	} else
 	{
@@ -190,7 +194,10 @@ void FrameEnd()
 		default:
 			break;
 	}
-	GetState()->map->changeFlags = 0;
+	if (GetState()->map)
+	{
+		GetState()->map->changeFlags = 0;
+	}
 }
 
 inline void UpdateViewportSize()
@@ -292,6 +299,20 @@ void LoadMapModels(const Map *map)
 			break;
 		case RENDERER_VULKAN:
 			VK_LoadMap(map);
+		default:
+			break;
+	}
+}
+
+void SetVsyncEnabled(const bool enabled)
+{
+	switch (currentRenderer)
+	{
+		case RENDERER_OPENGL:
+			GL_SetVsyncEnabled(enabled);
+			break;
+		case RENDERER_VULKAN:
+			// TODO
 		default:
 			break;
 	}

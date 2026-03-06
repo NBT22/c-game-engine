@@ -14,7 +14,7 @@
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_stdinc.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include "gameState/MenuState.h"
 
@@ -25,13 +25,14 @@ void LogoSplashStateFixedUpdate(GlobalState *state, double /*delta*/)
 		(void)PlaySound(SOUND("sfx/coincling"), SOUND_CATEGORY_SFX);
 	}
 
-	if (state->physicsFrame == 120 || IsKeyPressed(SDL_SCANCODE_ESCAPE) || IsButtonPressed(SDL_GAMEPAD_BUTTON_START))
+	if (state->physicsFrame == 120 ||
+		IsKeyPressed(physicsThreadInput, SDL_SCANCODE_ESCAPE) ||
+		IsButtonPressed(physicsThreadInput, SDL_GAMEPAD_BUTTON_START))
 	{
 		MenuStateSetWithFade();
 	}
 }
 
-// ReSharper disable once CppParameterMayBeConstPtrOrRef
 void LogoSplashStateRender(GlobalState *State)
 {
 	if (State->physicsFrame < 20 || State->physicsFrame > 100)

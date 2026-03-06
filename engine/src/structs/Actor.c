@@ -31,26 +31,20 @@ static uint64_t actorId;
 
 Actor *CreateActor(Transform *transform, const char *actorType, KvList params, JPH_BodyInterface *bodyInterface)
 {
-	Actor *actor = malloc(sizeof(Actor));
+	Actor *actor = calloc(1, sizeof(Actor));
 	CheckAlloc(actor);
 	// Simply incrementing this is fine, because if one actor were loaded every nanosecond it would take ~585 years to overflow
 	actor->id = actorId++;
-	actor->actorFlags = 0;
+	actor->definition = GetActorDefinition(actorType);
+	actor->visible = true;
+	actor->modColor = COLOR_WHITE;
 	actor->bodyInterface = bodyInterface;
 	actor->bodyId = JPH_BodyId_InvalidBodyID;
-	actor->visible = true;
-	actor->actorWall = NULL;
-	actor->health = 1;
-	actor->actorModel = NULL;
-	actor->currentSkinIndex = 0;
-	actor->currentLod = 0;
-	actor->modColor = COLOR_WHITE;
 	ListInit(actor->ioConnections, ActorConnection);
-	actor->extraData = NULL;
-	const ActorDefinition *definition = GetActorDefinition(actorType);
-	actor->definition = definition;
+
 	actor->definition->Init(actor, params, transform); // kindly allow the Actor to initialize itself
 	ActorFireOutput(actor, ACTOR_OUTPUT_SPAWNED, PARAM_NONE);
+
 	if (params)
 	{
 		KvListDestroy(params);
@@ -61,12 +55,12 @@ Actor *CreateActor(Transform *transform, const char *actorType, KvList params, J
 void FreeActor(Actor *actor)
 {
 	actor->definition->Destroy(actor);
-	if (actor->actorWall)
+	if (!actor->hasModel && actor->wall != NULL)
 	{
-		free(actor->actorWall->tex);
+		free(actor->wall->tex);
+		free(actor->wall);
+		actor->wall = NULL;
 	}
-	free(actor->actorWall);
-	actor->actorWall = NULL;
 	free(actor->extraData);
 	actor->extraData = NULL;
 	if (actor->bodyId != JPH_BodyId_InvalidBodyID && actor->bodyInterface != NULL)

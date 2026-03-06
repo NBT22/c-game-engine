@@ -20,9 +20,9 @@
 #include <joltc/Math/Transform.h>
 #include <joltc/Math/Vector3.h>
 #include <joltc/Physics/Body/BodyCreationSettings.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
-#include <joltc/types.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -56,8 +56,8 @@ static void GoalUpdate(Actor *this, double /*delta*/)
 	const float rotation = atan2f(GetState()->map->player.transform.position.z - position.z,
 								  GetState()->map->player.transform.position.x - position.x) +
 						   GLM_PI_2f;
-	this->actorWall->a = v2(0.5f * cosf(rotation), 0.5f * sinf(rotation));
-	this->actorWall->b = v2(-0.5f * cosf(rotation), -0.5f * sinf(rotation));
+	this->wall->a = v2(0.5f * cosf(rotation), 0.5f * sinf(rotation));
+	this->wall->b = v2(-0.5f * cosf(rotation), -0.5f * sinf(rotation));
 	ActorWallBake(this);
 }
 
@@ -91,16 +91,16 @@ void GoalInit(Actor *this, const KvList params, Transform *transform)
 	this->extraData = data;
 	data->enabled = KvGetBool(params, "startEnabled", true);
 
-	this->actorWall = malloc(sizeof(ActorWall));
-	CheckAlloc(this->actorWall);
-	this->actorWall->a = v2(0, 0.5f);
-	this->actorWall->b = v2(0, -0.5f);
-	this->actorWall->tex = malloc(strlen(TEXTURE("actor/goal0")) + 1);
-	strcpy(this->actorWall->tex, data->enabled ? TEXTURE("actor/goal0") : TEXTURE("actor/goal1"));
-	this->actorWall->uvScale = 1.0f;
-	this->actorWall->uvOffset = 0.0f;
-	this->actorWall->height = 1.0f;
-	this->actorWall->unshaded = false;
+	this->wall = malloc(sizeof(ActorWall));
+	CheckAlloc(this->wall);
+	this->wall->a = v2(0, 0.5f);
+	this->wall->b = v2(0, -0.5f);
+	this->wall->tex = malloc(strlen(TEXTURE("actor/goal0")) + 1);
+	strcpy(this->wall->tex, data->enabled ? TEXTURE("actor/goal0") : TEXTURE("actor/goal1"));
+	this->wall->uvScale = v2s(1.0f);
+	this->wall->uvOffset = v2s(0.0f);
+	this->wall->height = 1.0f;
+	this->wall->unshaded = false;
 	ActorWallBake(this);
 
 	const Transform adjustedTransform = {

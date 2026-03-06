@@ -18,9 +18,14 @@
 #include <joltc/Math/Vector3.h>
 #include <joltc/Physics/Body/Body.h>
 #include <joltc/Physics/Body/BodyCreationSettings.h>
+#include <joltc/Physics/Body/BodyFilter.h>
+#include <joltc/Physics/Body/BodyID.h>
 #include <joltc/Physics/Body/BodyInterface.h>
+#include <joltc/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <joltc/Physics/Collision/CastResult.h>
+#include <joltc/Physics/Collision/NarrowPhaseQuery.h>
+#include <joltc/Physics/Collision/ObjectLayer.h>
 #include <joltc/Physics/Collision/Shape/Shape.h>
-#include <joltc/types.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -70,13 +75,13 @@ static bool BodyFilterShouldCollide(const JPH_BodyID bodyId)
 {
 	JPH_BodyInterface *bodyInterface = JPH_PhysicsSystem_GetBodyInterface(GetState()->map->physicsSystem);
 	const Actor *actor = (const Actor *)JPH_BodyInterface_GetUserData(bodyInterface, bodyId);
-	return !actor || ((actor->actorFlags & ACTOR_FLAG_CAN_BLOCK_LASERS) == ACTOR_FLAG_CAN_BLOCK_LASERS);
+	return !actor || ((actor->flags & ACTOR_FLAG_CAN_BLOCK_LASERS) == ACTOR_FLAG_CAN_BLOCK_LASERS);
 }
 
 static bool BodyFilterShouldCollideLocked(const JPH_Body *body)
 {
 	const Actor *actor = (const Actor *)JPH_Body_GetUserData(body);
-	return !actor || ((actor->actorFlags & ACTOR_FLAG_CAN_BLOCK_LASERS) == ACTOR_FLAG_CAN_BLOCK_LASERS);
+	return !actor || ((actor->flags & ACTOR_FLAG_CAN_BLOCK_LASERS) == ACTOR_FLAG_CAN_BLOCK_LASERS);
 }
 
 static const JPH_BroadPhaseLayerFilter_Impl normalLaserBroadPhaseLayerFilterImpl = {
@@ -119,8 +124,7 @@ static inline void LaserCreateBody(Actor *this, const Transform *transform)
 	JPH_BodyCreationSettings_Destroy(bodyCreationSettings);
 }
 
-// ReSharper disable once CppParameterMayBeConstPtrOrRef
-static void LaserUpdate(Actor *this, double delta)
+static void LaserUpdate(Actor *this, const double delta)
 {
 	const LaserData *data = this->extraData;
 	if (data->on)
@@ -129,11 +133,12 @@ static void LaserUpdate(Actor *this, double delta)
 		const JPH_NarrowPhaseQuery *narrowPhaseQuery = JPH_PhysicsSystem_GetNarrowPhaseQuery(physicsSystem);
 		JPH_RayCastResult result = {};
 		Vector3 hitPointOffset = {};
-		JPH_BroadPhaseLayerFilter *broadPhaseLayerFilter = data->height == LASER_HEIGHT_TRIPLE
-																   ? tripleLaserBroadPhaseLayerFilter
-																   : normalLaserBroadPhaseLayerFilter;
-		JPH_ObjectLayerFilter *objectLayerFilter = data->height == LASER_HEIGHT_TRIPLE ? tripleLaserObjectLayerFilter
-																					   : normalLaserObjectLayerFilter;
+		const JPH_BroadPhaseLayerFilter *broadPhaseLayerFilter = data->height == LASER_HEIGHT_TRIPLE
+																		 ? tripleLaserBroadPhaseLayerFilter
+																		 : normalLaserBroadPhaseLayerFilter;
+		const JPH_ObjectLayerFilter *objectLayerFilter = data->height == LASER_HEIGHT_TRIPLE
+																 ? tripleLaserObjectLayerFilter
+																 : normalLaserObjectLayerFilter;
 		const bool hit = JPH_NarrowPhaseQuery_CastRay2_GAME(narrowPhaseQuery,
 															this->bodyInterface,
 															this->bodyId,
@@ -145,10 +150,10 @@ static void LaserUpdate(Actor *this, double delta)
 															bodyFilter);
 		if (hit)
 		{
-			this->actorWall->b = v2(hitPointOffset.x, hitPointOffset.z);
+			this->wall->b = v2(hitPointOffset.x, hitPointOffset.z);
 			ActorWallBake(this);
 		}
-		this->actorWall->uvOffset = (float)fmod(this->actorWall->uvOffset + delta / 8, 1.0);
+		this->wall->uvOffset.x = (float)fmod(this->wall->uvOffset.x + delta / 8, 1.0);
 	}
 }
 
@@ -156,14 +161,14 @@ static void LaserTurnOnHandler(Actor *this, const Actor * /*sender*/, const Para
 {
 	LaserData *data = this->extraData;
 	data->on = true;
+	this->visible = true;
 }
 
 static void LaserTurnOffHandler(Actor *this, const Actor * /*sender*/, const Param * /*param*/)
 {
 	LaserData *data = this->extraData;
 	data->on = false;
-	this->actorWall->b = v2(0.01, 0);
-	ActorWallBake(this);
+	this->visible = false;
 }
 
 void LaserInit(Actor *this, const KvList params, Transform *transform)
@@ -174,23 +179,18 @@ void LaserInit(Actor *this, const KvList params, Transform *transform)
 	data->height = KvGetByte(params, "height", LASER_HEIGHT_MIDDLE);
 	data->on = KvGetBool(params, "startOn", true);
 
-	this->actorWall = malloc(sizeof(ActorWall));
-	CheckAlloc(this->actorWall);
-	this->actorWall->a = v2s(0);
-	this->actorWall->b = v2s(0);
-	this->actorWall->tex = malloc(strlen(TEXTURE("actor/triplelaser")) + 1);
-	strcpy(this->actorWall->tex,
+	this->wall = malloc(sizeof(ActorWall));
+	CheckAlloc(this->wall);
+	this->wall->a = v2s(0);
+	this->wall->b = v2s(0);
+	this->wall->tex = malloc(strlen(TEXTURE("actor/triplelaser")) + 1);
+	strcpy(this->wall->tex,
 		   data->height == LASER_HEIGHT_TRIPLE ? TEXTURE("actor/triplelaser") : TEXTURE("actor/laser"));
-	this->actorWall->uvScale = 1.0f;
-	this->actorWall->uvOffset = 0.0f;
-	this->actorWall->height = 1.0f;
-	this->actorWall->unshaded = true;
-
-	if (!data->on)
-	{
-		this->actorWall->b = v2(0.01, 0);
-		ActorWallBake(this);
-	}
+	this->wall->uvScale = v2s(1.0f);
+	this->wall->uvOffset = v2s(0.0f);
+	this->wall->height = 1.0f;
+	this->wall->unshaded = true;
+	this->visible = data->on;
 
 	switch (data->height)
 	{
