@@ -18,10 +18,10 @@
 #include <luna/lunaImage.h>
 #include <luna/lunaInstance.h>
 #include <luna/lunaTypes.h>
-#include <SDL_rect.h>
-#include <SDL_stdinc.h>
-#include <SDL_video.h>
-#include <SDL_vulkan.h>
+#include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_video.h>
+#include <SDL3/SDL_vulkan.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -32,18 +32,11 @@ static SDL_Window *vulkanWindow;
 static VkSurfaceKHR surface;
 static VkPhysicalDeviceProperties physicalDeviceProperties;
 
-bool CreateInstance(SDL_Window *window)
+bool CreateInstance()
 {
-	vulkanWindow = window;
-
 	uint32_t extensionCount = 0;
-	if (SDL_Vulkan_GetInstanceExtensions(vulkanWindow, &extensionCount, NULL) == SDL_FALSE)
-	{
-		VulkanLogError("Failed to acquire extensions required for SDL window!\n");
-		return false;
-	}
-	const char *extensionNames[extensionCount];
-	if (SDL_Vulkan_GetInstanceExtensions(vulkanWindow, &extensionCount, extensionNames) == SDL_FALSE)
+	const char *const *extensionNames = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+	if (!extensionNames)
 	{
 		VulkanLogError("Failed to acquire extensions required for SDL window!\n");
 		return false;
@@ -64,9 +57,11 @@ bool CreateInstance(SDL_Window *window)
 	return true;
 }
 
-bool CreateSurface()
+bool CreateSurface(SDL_Window *window)
 {
-	if (SDL_Vulkan_CreateSurface(vulkanWindow, lunaGetInstance(), &surface) == SDL_FALSE)
+	vulkanWindow = window;
+
+	if (!SDL_Vulkan_CreateSurface(vulkanWindow, lunaGetInstance(), NULL, &surface))
 	{
 		VulkanLogError("Failed to create window surface\n");
 		return false;
@@ -133,7 +128,7 @@ bool CreateSwapchain()
 	{
 		int32_t width = 0;
 		int32_t height = 0;
-		SDL_Vulkan_GetDrawableSize(vulkanWindow, &width, &height);
+		SDL_GetWindowSizeInPixels(vulkanWindow, &width, &height);
 		swapChainExtent.width = clamp((uint32_t)width,
 									  capabilities.minImageExtent.width,
 									  capabilities.maxImageExtent.width);
@@ -230,7 +225,7 @@ bool CreateRenderPass()
 		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 	};
 	SDL_Rect bounds;
-	SDL_GetDisplayBounds(SDL_GetWindowDisplayIndex(vulkanWindow), &bounds);
+	SDL_GetDisplayBounds(SDL_GetDisplayForWindow(vulkanWindow), &bounds);
 	const LunaRenderPassCreationInfo renderPassCreationInfo = {
 		.samples = msaaSamples,
 		.createColorAttachment = true,

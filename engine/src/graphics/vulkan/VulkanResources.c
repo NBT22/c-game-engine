@@ -249,6 +249,7 @@ bool LoadTexture(const Image *image)
 		.writeInfo.pixels = image->pixelData,
 		.writeInfo.mipmapLevels = useMipmaps ? (uint8_t)log2(max(image->width, image->height)) + 1 : 1,
 		.writeInfo.generateMipmaps = useMipmaps,
+		.writeInfo.mipmapFilter = VK_FILTER_LINEAR,
 		.writeInfo.sourceStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		.writeInfo.destinationStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		.writeInfo.destinationAccessMask = VK_ACCESS_SHADER_READ_BIT,

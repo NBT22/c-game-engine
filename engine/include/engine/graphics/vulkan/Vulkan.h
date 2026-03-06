@@ -11,7 +11,7 @@
 #include <engine/structs/Color.h>
 #include <engine/structs/Map.h>
 #include <joltc/Math/Vector3.h>
-#include <SDL_video.h>
+#include <SDL3/SDL_video.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -29,14 +29,8 @@
 #define VK_X_TO_NDC(x) ((float)(x) / ScaledWindowWidthFloat() * 2.0f - 1.0f)
 #define VK_Y_TO_NDC(y) ((float)(y) / ScaledWindowHeightFloat() * 2.0f - 1.0f)
 
-/**
- * This function is used to create the Vulkan instance and surface, as well as configuring the environment properly.
- * This function (and the functions it calls) do NOT perform any drawing, though the framebuffers are initialized here.
- * @param window The window to initialize Vulkan for.
- * @see CreateInstance
- * @see PickPhysicalDevice
- * @see CreateLogicalDevice
- */
+bool VK_PreInit();
+
 bool VK_Init(SDL_Window *window);
 
 bool VK_FrameStart();
@@ -56,7 +50,7 @@ bool VK_FrameEnd();
 bool VK_LoadMap(const Map *map);
 
 /// A function used to destroy the Vulkan objects when they are no longer needed.
-bool VK_Cleanup();
+void VK_Cleanup();
 
 void VK_Minimize();
 

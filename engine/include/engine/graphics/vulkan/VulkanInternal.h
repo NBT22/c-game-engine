@@ -7,12 +7,12 @@
 #ifndef VULKANINTERNAL_H
 #define VULKANINTERNAL_H
 
-#include <SDL_video.h>
+#include <SDL3/SDL_video.h>
 #include <stdbool.h>
 
-bool CreateInstance(SDL_Window *window);
+bool CreateInstance();
 
-bool CreateSurface();
+bool CreateSurface(SDL_Window *window);
 
 bool CreateLogicalDevice();
 

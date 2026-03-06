@@ -6,7 +6,7 @@
 #define GAME_LIST_H
 
 #include <assert.h>
-#include <SDL_mutex.h>
+#include <SDL3/SDL_mutex.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -28,7 +28,7 @@ struct LockingList
 {
 	struct List;
 	/// The mutex used to ensure synchronization across threads
-	SDL_mutex *mutex;
+	SDL_Mutex *mutex;
 };
 
 struct SortedList
@@ -37,8 +37,6 @@ struct SortedList
 	/// The function for comparing of values
 	int (*CompareFunction)(const void *, const void *);
 };
-
-#define List()
 
 
 // NOLINTBEGIN(*-reserved-identifier)

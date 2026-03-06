@@ -15,8 +15,8 @@
 #include <engine/subsystem/Logging.h>
 #include <GL/gl.h>
 #include <GL/glew.h>
-#include <SDL_error.h>
-#include <SDL_video.h>
+#include <SDL3/SDL_error.h>
+#include <SDL3/SDL_video.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <wchar.h>
@@ -27,10 +27,6 @@ bool GL_PreInit()
 {
 	LogDebug("Pre-initializing OpenGL...\n");
 	const bool msaaEnabled = GetState()->options.msaa != MSAA_NONE;
-	if (SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, msaaEnabled) != 0)
-	{
-		LogError("Failed to set MSAA buffers attribute: %s\n", SDL_GetError());
-	}
 	if (msaaEnabled)
 	{
 		int mssaValue = 0;
@@ -99,7 +95,7 @@ bool GL_Init(SDL_Window *wnd)
 	const GLenum err = glewInit();
 	if (err != GLEW_OK)
 	{
-		SDL_GL_DeleteContext(ctx);
+		SDL_GL_DestroyContext(ctx);
 		LogError("glewInit Failed with error %d\n", err);
 		return false;
 	}
@@ -107,7 +103,7 @@ bool GL_Init(SDL_Window *wnd)
 	// Ensure we have GL 3.3 or higher
 	if (!GL_VERSION_CHECK)
 	{
-		SDL_GL_DeleteContext(ctx);
+		SDL_GL_DestroyContext(ctx);
 		LogError("OpenGL: GL_VERSION_CHECK failed\n");
 		return false;
 	}
@@ -219,5 +215,5 @@ void GL_DestroyGL()
 	GL_DestroyFramebuffer();
 	GL_DestroyShaders();
 	GL_DestroyObjects();
-	SDL_GL_DeleteContext(ctx);
+	SDL_GL_DestroyContext(ctx);
 }

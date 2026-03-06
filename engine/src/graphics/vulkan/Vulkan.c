@@ -25,8 +25,8 @@
 #include <luna/lunaInstance.h>
 #include <luna/lunaTypes.h>
 #include <math.h>
-#include <SDL_error.h>
-#include <SDL_video.h>
+#include <SDL3/SDL_error.h>
+#include <SDL3/SDL_video.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -424,11 +424,24 @@ static inline VkResult DrawViewmodel(const LunaGraphicsPipelineBindInfo *pipelin
 	return VK_SUCCESS;
 }
 
+bool VK_PreInit()
+{
+	LogDebug("Creating Vulkan instance...\n");
+	if (!CreateInstance())
+	{
+		VK_Cleanup();
+
+		return false;
+	}
+
+	return true;
+}
+
 bool VK_Init(SDL_Window *window)
 {
 	LogDebug("Initializing Vulkan renderer...\n");
 	// clang-format off
-	if (CreateInstance(window) && CreateSurface() && CreateLogicalDevice() && CreateSwapchain() && CreateRenderPass() &&
+	if (CreateSurface(window) && CreateLogicalDevice() && CreateSwapchain() && CreateRenderPass() &&
 		CreateDescriptorSetLayouts() && CreateGraphicsPipelines() && CreateTextureSamplers() && CreateBuffers() &&
 		CreateDescriptorSet())
 	{
@@ -485,10 +498,7 @@ bool VK_Init(SDL_Window *window)
 		return true;
 	}
 
-	if (!VK_Cleanup())
-	{
-		VulkanLogError("Cleanup failed!");
-	}
+	VK_Cleanup();
 
 	return false;
 }
@@ -500,11 +510,7 @@ bool VK_FrameStart()
 		return VK_NOT_READY;
 	}
 
-	if (LockLodThreadMutex() != 0)
-	{
-		LogError("Failed to lock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
+	LockLodThreadMutex(); // TODO: Why is this required
 
 	VulkanTestResizeSwapchain(lunaBeginFrame(false), "Failed to begin frame!");
 	const LunaRenderPassBeginInfo beginInfo = {
@@ -513,11 +519,7 @@ bool VK_FrameStart()
 	};
 	VulkanTest(lunaBeginRenderPass(renderPass, &beginInfo), "Failed to begin render pass!");
 
-	if (UnlockLodThreadMutex() != 0)
-	{
-		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
+	UnlockLodThreadMutex(); // TODO: Why is this required
 
 	buffers.ui.freeQuads = buffers.ui.allocatedQuads;
 #ifdef JPH_DEBUG_RENDERER
@@ -645,11 +647,7 @@ bool VK_FrameEnd()
 				   "Failed to write UI index buffer!");
 	}
 
-	if (LockLodThreadMutex() != 0)
-	{
-		LogError("Failed to lock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
+	LockLodThreadMutex(); // TODO: Why is this required
 
 	if (buffers.ui.freeQuads != buffers.ui.allocatedQuads)
 	{
@@ -701,23 +699,17 @@ bool VK_FrameEnd()
 	lunaEndRenderPass();
 
 	VulkanTestResizeSwapchain(lunaEndFrame(), "Failed to present swapchain!");
-	if (UnlockLodThreadMutex() != 0)
-	{
-		LogError("Failed to unlock LOD thread mutex with error: %s", SDL_GetError());
-		return VK_ERROR_UNKNOWN;
-	}
+	UnlockLodThreadMutex(); // TODO: Why is this required
 
 	return true;
 }
 
-bool VK_Cleanup()
+void VK_Cleanup()
 {
 	LogDebug("Cleaning up Vulkan renderer...\n");
-	VulkanTest(lunaDestroyInstance(), "Cleanup failed!");
 	free(buffers.ui.vertexData);
 	free(buffers.ui.indexData);
-
-	return true;
+	VulkanTestInternal(lunaDestroyInstance(), (void)0, "Cleanup failed!");
 }
 
 /**
