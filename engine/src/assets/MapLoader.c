@@ -102,7 +102,7 @@ bool LoadMap(Map *map, Asset *mapData)
 			// TODO data size validation for params
 			if (hasOverride)
 			{
-				size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection->outParamOverride);
+				size_t paramSize = ReadParam(mapData->data, mapData->size, &offset, &connection.outParamOverride);
 				bytesRemaining -= paramSize;
 			} else
 			{

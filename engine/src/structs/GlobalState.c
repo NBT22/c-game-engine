@@ -65,7 +65,6 @@ void GiveItem(const ItemDefinition *definition, const bool switchToItem)
 {
 	if (switchToItem)
 	{
-		// TODO: Use ListFind
 		for (size_t i = 0; i < state.saveData->items.length; i++)
 		{
 			if (ListGet(state.saveData->items, i, Item).definition == definition)
@@ -166,7 +165,6 @@ void DestroyGlobalState()
 	{
 		Item *item = &ListGet(state.saveData->items, i, Item);
 		item->definition->Destruct(item);
-		free(item);
 	}
 	ListFree(state.saveData->items);
 	free(state.saveData);

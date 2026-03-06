@@ -164,9 +164,9 @@ static inline VkResult LoadActor(const Actor *actor)
 		return VK_SUCCESS;
 	}
 	// TODO: Load instance data and draw data
-	if (actor->actorModel)
+	if (actor->model)
 	{
-		return LoadModelLods(actor->actorModel);
+		return LoadModelLods(actor->model);
 	}
 
 	// TODO: Load non-model actors

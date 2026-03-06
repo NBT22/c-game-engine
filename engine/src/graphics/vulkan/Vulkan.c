@@ -731,7 +731,11 @@ bool VK_LoadMap(const Map *map)
 
 	VulkanTest(LoadActors(), "Failed to load actors!");
 
-	skyTextureIndex = TextureIndex(map->skyTexture);
+	if (map->renderSky)
+	{
+		skyTextureIndex = TextureIndex(map->skyTexture);
+	}
+
 	loadedMap = map;
 
 	return true;
