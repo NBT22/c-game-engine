@@ -516,7 +516,7 @@ bool VK_FrameStart()
 		.renderArea.extent = swapChainExtent,
 		.depthAttachmentClearValue.depthStencil.depth = 1,
 	};
-	VulkanTest(lunaBeginRenderPass(renderPass, &beginInfo), "Failed to begin render pass!");
+	VulkanTestResizeSwapchain(lunaBeginRenderPass(renderPass, &beginInfo), "Failed to begin render pass!");
 
 	UnlockLodThreadMutex(); // TODO: Why is this required
 

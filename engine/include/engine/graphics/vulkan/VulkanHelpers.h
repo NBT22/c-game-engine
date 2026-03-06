@@ -62,7 +62,7 @@
 				VulkanTest(lunaResizeSwapchain(1, &renderPassResizeInfo, NULL, &swapChainExtent), \
 						   "Failed to resize swapchain!"); \
 				UnlockLodThreadMutex(); \
-				return resizeCheckResult; \
+				return false; \
 			} \
 			VulkanTest(resizeCheckResult, __VA_ARGS__); \
 		} \
