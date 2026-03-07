@@ -425,6 +425,23 @@ static inline VkResult DrawViewmodel(const LunaGraphicsPipelineBindInfo *pipelin
 	return VK_SUCCESS;
 }
 
+static inline VkResult HandleRendererQueuedActions()
+{
+	if (rendererQueuedActions & QUEUED_ACTION_CLEAR_ALL_TEXTURES)
+	{
+		ClearTextureCache();
+		rendererQueuedActions &= ~QUEUED_ACTION_CLEAR_ALL_TEXTURES;
+	}
+	if (rendererQueuedActions & QUEUED_ACTION_CLEAR_ALL_MODELS)
+	{
+		ClearModelCache();
+		VulkanTestReturnResult(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky model!");
+		rendererQueuedActions &= ~QUEUED_ACTION_CLEAR_ALL_MODELS;
+	}
+
+	return VK_SUCCESS;
+}
+
 bool VK_PreInit()
 {
 	LogDebug("Creating Vulkan instance...\n");
@@ -510,6 +527,8 @@ bool VK_FrameStart()
 	{
 		return false;
 	}
+
+	HandleRendererQueuedActions();
 
 	LockLodThreadMutex(); // TODO: Why is this required
 
@@ -608,7 +627,10 @@ bool VK_RenderMap(const Map *map, const Camera *camera)
 		.dynamicStates = dynamicStateBindInfos,
 	};
 
-	VulkanTest(DrawSky(&pipelineBindInfo), "Failed to draw sky!");
+	if (map->renderSky)
+	{
+		VulkanTest(DrawSky(&pipelineBindInfo), "Failed to draw sky!");
+	}
 	VulkanTest(DrawMap(&pipelineBindInfo), "Failed to draw map!");
 	if (map->viewmodel.enabled)
 	{

@@ -19,6 +19,7 @@
 #include <joltc/Math/Quat.h>
 #include <joltc/Math/Vector3.h>
 #include <luna/luna.h>
+#include <luna/lunaImage.h>
 #include <luna/lunaTypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -63,6 +64,21 @@ Pipelines pipelines = {
 uint32_t pendingTasks = 0;
 uint32_t skyTextureIndex = 0;
 #pragma endregion variables
+
+void ClearTextureCache()
+{
+	memset(imageAssetIdToIndexMap, -1, sizeof(*imageAssetIdToIndexMap) * MAX_TEXTURES);
+	for (size_t i = 0; i < textures.length; i++)
+	{
+		lunaDestroyImage(ListGet(textures, i, LunaImage));
+	}
+	ListClear(textures);
+}
+
+void ClearModelCache()
+{
+	// TODO: Implement me
+}
 
 VkResult CreateShaderModule(const char *path, const ShaderType shaderType, LunaShaderModule *shaderModule)
 {

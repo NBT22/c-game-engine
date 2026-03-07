@@ -264,6 +264,10 @@ extern uint32_t pendingTasks; // Bits set with PendingTasksBitFlags
 extern uint32_t skyTextureIndex;
 #pragma endregion variables
 
+void ClearTextureCache();
+
+void ClearModelCache();
+
 VkResult CreateShaderModule(const char *path, ShaderType shaderType, LunaShaderModule *shaderModule);
 
 uint32_t TextureIndex(const char *texture);

@@ -315,6 +315,8 @@ void DestroyModelLoader()
 		FreeModel(models[i]);
 		models[i] = NULL;
 	}
+	modelId = 0;
+	lodId = 0;
 }
 
 JPH_Shape *CreateDynamicModelShape(const size_t numHulls, const ModelConvexHull *hulls)
