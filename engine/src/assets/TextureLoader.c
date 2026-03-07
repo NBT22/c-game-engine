@@ -87,7 +87,7 @@ Image *LoadImage(const char *asset)
 	Image *img = malloc(sizeof(Image));
 	CheckAlloc(img);
 
-	Asset *textureAsset = DecompressAsset(asset, false);
+	Asset *textureAsset = DecompressAsset(asset, false, false);
 	size_t offset = 0;
 	if (textureAsset == NULL || textureAsset->type != ASSET_TYPE_TEXTURE)
 	{
@@ -209,6 +209,8 @@ void DestroyTextureLoader()
 			free(images[i]->name);
 			free(images[i]->pixelData);
 			free(images[i]);
+			images[i] = NULL;
 		}
 	}
+	textureId = 0;
 }

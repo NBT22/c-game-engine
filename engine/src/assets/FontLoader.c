@@ -54,7 +54,7 @@ Font *GenerateFallbackFont()
 
 Font *LoadFont(const char *asset)
 {
-	Asset *assetData = DecompressAsset(asset, false);
+	Asset *assetData = DecompressAsset(asset, false, false);
 	if (assetData == NULL)
 	{
 		LogError("Failed to load font from asset, asset was NULL!\n");
