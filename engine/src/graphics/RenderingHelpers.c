@@ -211,7 +211,7 @@ inline void UpdateViewportSize()
 	switch (currentRenderer)
 	{
 		case RENDERER_VULKAN:
-			// Unused
+			VK_UpdateViewportSize();
 			break;
 		case RENDERER_OPENGL:
 			GL_UpdateViewportSize();

@@ -29,6 +29,7 @@
 
 #pragma region variables
 bool minimized = false;
+VkSurfaceKHR surface = VK_NULL_HANDLE;
 VkExtent2D swapChainExtent = {0};
 VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 LunaRenderPass renderPass = LUNA_NULL_HANDLE;

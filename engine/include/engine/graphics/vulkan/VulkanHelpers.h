@@ -249,6 +249,7 @@ typedef struct DescriptorSetLayouts
 // TODO: Make sure these are all needed and are all as they should be
 
 extern bool minimized;
+extern VkSurfaceKHR surface;
 extern VkExtent2D swapChainExtent;
 extern VkSampleCountFlagBits msaaSamples;
 extern LunaRenderPass renderPass;

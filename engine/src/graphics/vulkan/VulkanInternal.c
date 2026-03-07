@@ -29,7 +29,6 @@
 #include <vulkan/vulkan_core.h>
 
 static SDL_Window *vulkanWindow;
-static VkSurfaceKHR surface;
 static VkPhysicalDeviceProperties physicalDeviceProperties;
 
 bool CreateInstance()

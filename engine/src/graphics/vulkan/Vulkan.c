@@ -8,6 +8,7 @@
 #include <engine/assets/ModelLoader.h>
 #include <engine/assets/TextureLoader.h>
 #include <engine/graphics/Drawing.h>
+#include <engine/graphics/RenderingHelpers.h>
 #include <engine/graphics/vulkan/Vulkan.h>
 #include <engine/graphics/vulkan/VulkanActors.h>
 #include <engine/graphics/vulkan/VulkanHelpers.h>
@@ -15,6 +16,7 @@
 #include <engine/structs/Camera.h>
 #include <engine/structs/Color.h>
 #include <engine/structs/Map.h>
+#include <engine/structs/Vector2.h>
 #include <engine/structs/Viewmodel.h>
 #include <engine/subsystem/Logging.h>
 #include <engine/subsystem/threads/LodThread.h>
@@ -506,7 +508,7 @@ bool VK_FrameStart()
 {
 	if (minimized)
 	{
-		return VK_NOT_READY;
+		return false;
 	}
 
 	LockLodThreadMutex(); // TODO: Why is this required
@@ -737,6 +739,24 @@ bool VK_LoadMap(const Map *map)
 	}
 
 	loadedMap = map;
+
+	return true;
+}
+
+bool VK_UpdateViewportSize()
+{
+	const Vector2 windowSize = ActualWindowSizeIgnoreDPI();
+	const VkExtent2D targetSwapchainSize = {
+		.width = windowSize.x,
+		.height = windowSize.y,
+	};
+	const LunaRenderPassResizeInfo renderPassResizeInfo = {
+		.renderPass = renderPass,
+		.width = LUNA_RENDER_PASS_WIDTH_SWAPCHAIN_WIDTH,
+		.height = LUNA_RENDER_PASS_HEIGHT_SWAPCHAIN_HEIGHT,
+	};
+	VulkanTest(lunaResizeSwapchain(1, &renderPassResizeInfo, &targetSwapchainSize, &swapChainExtent),
+			   "Failed to resize swapchain!");
 
 	return true;
 }

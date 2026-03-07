@@ -52,6 +52,8 @@ bool VK_LoadMap(const Map *map);
 /// A function used to destroy the Vulkan objects when they are no longer needed.
 void VK_Cleanup();
 
+bool VK_UpdateViewportSize();
+
 void VK_Minimize();
 
 void VK_Restore();
