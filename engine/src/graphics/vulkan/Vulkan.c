@@ -35,6 +35,8 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
+#include "luna/luna.h"
+
 #ifdef JPH_DEBUG_RENDERER
 #include <engine/debug/JoltDebugRenderer.h>
 #include <engine/subsystem/Error.h>
@@ -425,21 +427,30 @@ static inline VkResult DrawViewmodel(const LunaGraphicsPipelineBindInfo *pipelin
 	return VK_SUCCESS;
 }
 
-static inline VkResult HandleRendererQueuedActions()
+static inline bool HandleRendererQueuedActions()
 {
+	const RendererQueuedAction handledActionTypes = QUEUED_ACTION_CLEAR_ALL_TEXTURES | QUEUED_ACTION_CLEAR_ALL_MODELS;
 	if (rendererQueuedActions & QUEUED_ACTION_CLEAR_ALL_TEXTURES)
 	{
-		ClearTextureCache();
-		rendererQueuedActions &= ~QUEUED_ACTION_CLEAR_ALL_TEXTURES;
+		if (!ClearTextureCache())
+		{
+			return false;
+		}
 	}
 	if (rendererQueuedActions & QUEUED_ACTION_CLEAR_ALL_MODELS)
 	{
 		ClearModelCache();
-		VulkanTestReturnResult(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky model!");
-		rendererQueuedActions &= ~QUEUED_ACTION_CLEAR_ALL_MODELS;
 	}
+	if ((rendererQueuedActions & handledActionTypes) != 0)
+	{
+		if (!VK_LoadMap(loadedMap))
+		{
+			return false;
+		}
+	}
+	rendererQueuedActions &= ~handledActionTypes;
 
-	return VK_SUCCESS;
+	return true;
 }
 
 bool VK_PreInit()
@@ -509,8 +520,6 @@ bool VK_Init(SDL_Window *window)
 				VK_API_VERSION_MINOR(physicalDeviceProperties.apiVersion),
 				VK_API_VERSION_PATCH(physicalDeviceProperties.apiVersion));
 
-		VulkanTest(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky model!");
-
 		InitActorLoadingVariables();
 
 		return true;
@@ -528,7 +537,10 @@ bool VK_FrameStart()
 		return false;
 	}
 
-	HandleRendererQueuedActions();
+	if (!HandleRendererQueuedActions())
+	{
+		return false;
+	}
 
 	LockLodThreadMutex(); // TODO: Why is this required
 
@@ -749,7 +761,14 @@ void VK_Cleanup()
  */
 bool VK_LoadMap(const Map *map)
 {
-	VulkanTest(LoadMapModelsToBuffer(map->modelCount, map->models), "Failed to load map model!");
+	if (map == NULL)
+	{
+		loadedMap = NULL;
+
+		return true;
+	}
+
+	VulkanTest(LoadMapModelsToBuffer(map->modelCount, map->models), "Failed to load map models!");
 
 	VulkanTest(LoadViewmodel(&map->viewmodel), "Failed to load viewmodel!");
 
@@ -757,6 +776,7 @@ bool VK_LoadMap(const Map *map)
 
 	if (map->renderSky)
 	{
+		VulkanTestReturnResult(LoadSky(LoadModel(MODEL("sky"))), "Failed to load sky model!");
 		skyTextureIndex = TextureIndex(map->skyTexture);
 	}
 

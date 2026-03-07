@@ -233,11 +233,11 @@ bool LoadTexture(const Image *image)
 	}
 	if (!image->filter && image->repeat)
 	{
-		sampler = useMipmaps ? textureSamplers.nearestRepeatAnisotropy : textureSamplers.nearestRepeatNoAnisotropy;
+		sampler = textureSamplers.nearestRepeatNoAnisotropy;
 	}
 	if (!image->filter && !image->repeat)
 	{
-		sampler = useMipmaps ? textureSamplers.nearestNoRepeatAnisotropy : textureSamplers.nearestNoRepeatNoAnisotropy;
+		sampler = textureSamplers.nearestNoRepeatNoAnisotropy;
 	}
 	const LunaSampledImageCreationInfo imageCreationInfo = {
 		.format = VK_FORMAT_R8G8B8A8_UNORM,

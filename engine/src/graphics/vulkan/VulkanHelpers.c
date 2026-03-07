@@ -28,6 +28,8 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
+#include "engine/graphics/vulkan/VulkanInternal.h"
+
 #pragma region variables
 bool minimized = false;
 VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -37,9 +39,7 @@ LunaRenderPass renderPass = LUNA_NULL_HANDLE;
 uint32_t imageAssetIdToIndexMap[MAX_TEXTURES];
 TextureSamplers textureSamplers = {
 	.linearRepeatAnisotropy = LUNA_NULL_HANDLE,
-	.nearestRepeatAnisotropy = LUNA_NULL_HANDLE,
 	.linearNoRepeatAnisotropy = LUNA_NULL_HANDLE,
-	.nearestNoRepeatAnisotropy = LUNA_NULL_HANDLE,
 	.linearRepeatNoAnisotropy = LUNA_NULL_HANDLE,
 	.nearestRepeatNoAnisotropy = LUNA_NULL_HANDLE,
 	.linearNoRepeatNoAnisotropy = LUNA_NULL_HANDLE,
@@ -65,7 +65,7 @@ uint32_t pendingTasks = 0;
 uint32_t skyTextureIndex = 0;
 #pragma endregion variables
 
-void ClearTextureCache()
+bool ClearTextureCache()
 {
 	memset(imageAssetIdToIndexMap, -1, sizeof(*imageAssetIdToIndexMap) * MAX_TEXTURES);
 	for (size_t i = 0; i < textures.length; i++)
@@ -73,6 +73,13 @@ void ClearTextureCache()
 		lunaDestroyImage(ListGet(textures, i, LunaImage));
 	}
 	ListClear(textures);
+	lunaDestroySampler(textureSamplers.linearRepeatAnisotropy);
+	lunaDestroySampler(textureSamplers.linearNoRepeatAnisotropy);
+	lunaDestroySampler(textureSamplers.linearRepeatNoAnisotropy);
+	lunaDestroySampler(textureSamplers.nearestRepeatNoAnisotropy);
+	lunaDestroySampler(textureSamplers.linearNoRepeatNoAnisotropy);
+	lunaDestroySampler(textureSamplers.nearestNoRepeatNoAnisotropy);
+	return CreateTextureSamplers();
 }
 
 void ClearModelCache()

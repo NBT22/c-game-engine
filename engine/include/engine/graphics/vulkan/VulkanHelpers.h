@@ -227,9 +227,7 @@ typedef struct Pipelines
 typedef struct TextureSamplers
 {
 	LunaSampler linearRepeatAnisotropy;
-	LunaSampler nearestRepeatAnisotropy;
 	LunaSampler linearNoRepeatAnisotropy;
-	LunaSampler nearestNoRepeatAnisotropy;
 	LunaSampler linearRepeatNoAnisotropy;
 	LunaSampler nearestRepeatNoAnisotropy;
 	LunaSampler linearNoRepeatNoAnisotropy;
@@ -264,7 +262,7 @@ extern uint32_t pendingTasks; // Bits set with PendingTasksBitFlags
 extern uint32_t skyTextureIndex;
 #pragma endregion variables
 
-void ClearTextureCache();
+bool ClearTextureCache();
 
 void ClearModelCache();
 
