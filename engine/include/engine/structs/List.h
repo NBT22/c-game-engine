@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef int (*SortedListCompareFunction)(const void *, const void *);
+
 typedef struct List List;
 typedef struct LockingList LockingList;
 typedef struct SortedList SortedList;
@@ -35,14 +37,14 @@ struct SortedList
 {
 	struct List;
 	/// The function for comparing of values
-	int (*CompareFunction)(const void *, const void *);
+	SortedListCompareFunction CompareFunction;
 };
 
 
 // NOLINTBEGIN(*-reserved-identifier)
 void _ListInit(List *list, size_t stride);
 void _LockingListInit(LockingList *list, size_t stride);
-void _SortedListInit(SortedList *list, size_t stride, int (*CompareFunction)(const void *, const void *));
+void _SortedListInit(SortedList *list, size_t stride, SortedListCompareFunction CompareFunction);
 
 void _ListCopy(const List *restrict oldList, List *restrict newList);
 void _LockingListCopy(const LockingList *restrict oldList, LockingList *restrict newList);

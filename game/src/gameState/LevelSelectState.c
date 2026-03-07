@@ -30,7 +30,7 @@
 #include <string.h>
 
 int selectedLevel = 0;
-List levelList;
+SortedList levelList;
 
 void LevelSelectStateUpdate(GlobalState * /*state*/)
 {
@@ -45,13 +45,13 @@ void LevelSelectStateUpdate(GlobalState * /*state*/)
 			IsButtonJustPressed(mainThreadInput, SDL_GAMEPAD_BUTTON_DPAD_DOWN) ||
 			GetMouseWheelTicks(mainThreadInput).y < 0)
 		{
-			selectedLevel--;
+			selectedLevel++;
 			selectedLevel = wrap(selectedLevel, 0, levelList.length);
 		} else if (IsKeyJustPressed(mainThreadInput, SDL_SCANCODE_UP) ||
 				   IsButtonJustPressed(mainThreadInput, SDL_GAMEPAD_BUTTON_DPAD_UP) ||
 				   GetMouseWheelTicks(mainThreadInput).y > 0)
 		{
-			selectedLevel++;
+			selectedLevel--;
 			selectedLevel = wrap(selectedLevel, 0, levelList.length);
 		}
 	}
@@ -93,7 +93,7 @@ void LevelSelectStateRender(GlobalState * /*state*/)
 
 void LoadLevelList()
 {
-	ListInit(levelList, const char *);
+	ListInit(levelList, const char *, (SortedListCompareFunction)strcmp);
 	EnumerateAssetsInFolder("map", &levelList, ".gmap");
 }
 

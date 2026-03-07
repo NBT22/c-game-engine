@@ -74,7 +74,7 @@ static inline VkResult LoadModelLods(const ModelDefinition *model)
 	for (uint32_t i = 0; i < model->lodCount; i++)
 	{
 		const ModelLod *lod = model->lods + i;
-		if (ListFind(modelLods, MODEL_LOD_DATA(model->id, lod->id)) == -1u)
+		if (ListFind(modelLods, MODEL_LOD_DATA(model->id, lod->id)) == SIZE_MAX)
 		{
 			vertexSize += lod->vertexCount * sizeof(ModelVertex);
 			indexSize += lod->totalIndexCount * sizeof(uint32_t);
@@ -102,7 +102,7 @@ static inline VkResult LoadModelLods(const ModelDefinition *model)
 	{
 		const ModelLod *lod = model->lods + i;
 		const uint64_t modelLodId = MODEL_LOD_ID(model->id, lod->id);
-		if (ListFind(modelLods, modelLodId) != -1u)
+		if (ListFind(modelLods, modelLodId) != SIZE_MAX)
 		{
 			continue;
 		}

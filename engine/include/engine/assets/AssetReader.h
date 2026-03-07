@@ -52,7 +52,14 @@ void AssetCacheInit();
  */
 void DestroyAssetCache();
 
-void EnumerateAssetsInFolder(const char *folder, List *output, const char *extension);
+/**
+ * Get all assets of a certain type that are in a folder
+ * @param folder The folder to enumerate the assets of
+ * @param output A @c SortedList containing elements of @code const char *@endcode
+ * @param extension The file extension to search for
+ * @warning The output list must contain elements of @code const char *@endcode
+ */
+void EnumerateAssetsInFolder(const char *folder, SortedList *output, const char *extension);
 
 /**
  * Create an asset directly from a file handle. This does NOT cache the asset, as it has no associated path.

@@ -4,7 +4,6 @@
 
 #include <engine/assets/AssetReader.h>
 #include <engine/assets/GameConfigLoader.h>
-#include <engine/helpers/Arguments.h>
 #include <engine/helpers/PlatformHelpers.h>
 #include <engine/structs/Asset.h>
 #include <engine/structs/GlobalState.h>
@@ -20,22 +19,17 @@
 
 GameConfig gameConfig = {0};
 
-AssetPath *CreateAssetPath(const AssetPathType type, const AssetPathFlags flags, const char *path)
+void AssetPathSetPath(AssetPath *assetPath, const char *path)
 {
-	AssetPath *assetPath = malloc(sizeof(AssetPath));
-	CheckAlloc(assetPath);
-	assetPath->flags = flags;
-	assetPath->type = type;
-	if (type == ABSOLUTE_PATH)
+	if (assetPath->type == ABSOLUTE_PATH)
 	{
 		assetPath->path = strdup(path);
-	} else if (type == RELATIVE_TO_EXECUTABLE_DIRECTORY)
+	} else if (assetPath->type == RELATIVE_TO_EXECUTABLE_DIRECTORY)
 	{
 		const size_t pathLen = strlen(GetState()->executableFolder) + 1 + strlen(path) + 1;
 		assetPath->path = malloc(pathLen);
 		snprintf(assetPath->path, pathLen, "%s/%s", GetState()->executableFolder, path);
 	}
-	return assetPath;
 }
 
 void LoadGameConfig(const char *game)
@@ -79,7 +73,7 @@ void LoadGameConfig(const char *game)
 	gameConfig.gameCopyright = strdup(KvGetString(configList, "game_copyright", ""));
 	gameConfig.discordAppId = KvGetUint64(configList, "discord_app_id", 0);
 
-	ListInit(gameConfig.assetPaths, LIST_POINTER);
+	ListInit(gameConfig.assetPaths, AssetPath);
 
 	ParamArray *searchPaths = KvGetArray(configList, "search_paths");
 	if (!searchPaths)
@@ -95,17 +89,19 @@ void LoadGameConfig(const char *game)
 			const bool allowCodeExec = KvGetBool(searchPathParam->kvListValue, "allow_code_execution", false);
 			const bool pathIsAbsolute = KvGetBool(searchPathParam->kvListValue, "path_is_absolute", false);
 			const char *searchPath = KvGetString(searchPathParam->kvListValue, "search_path", "");
-			const AssetPathType type = pathIsAbsolute ? ABSOLUTE_PATH : RELATIVE_TO_EXECUTABLE_DIRECTORY;
-			AssetPathFlags flags = 0;
-			if (allowCodeExec)
-			{
-				flags |= ASSET_PATH_ALLOW_CODE_EXECUTION;
-			}
-			ListAdd(gameConfig.assetPaths, CreateAssetPath(type, flags, searchPath));
+			AssetPath assetPath = {
+				.type = pathIsAbsolute ? ABSOLUTE_PATH : RELATIVE_TO_EXECUTABLE_DIRECTORY,
+				.flags = allowCodeExec ? ASSET_PATH_ALLOW_CODE_EXECUTION : 0,
+			};
+			AssetPathSetPath(&assetPath, searchPath);
+			ListAdd(gameConfig.assetPaths, assetPath);
 		} else if (searchPathParam->type == PARAM_TYPE_STRING)
 		{
-			ListAdd(gameConfig.assetPaths,
-					CreateAssetPath(RELATIVE_TO_EXECUTABLE_DIRECTORY, 0, searchPathParam->stringValue));
+			AssetPath assetPath = {
+				.type = RELATIVE_TO_EXECUTABLE_DIRECTORY,
+			};
+			AssetPathSetPath(&assetPath, searchPathParam->stringValue);
+			ListAdd(gameConfig.assetPaths, assetPath);
 		} else
 		{
 			Error("Invalid search path in game.gkvl");
@@ -127,9 +123,7 @@ void DestroyGameConfig()
 	LogDebug("Destroying game config...\n");
 	for (size_t i = 0; i < gameConfig.assetPaths.length; i++)
 	{
-		AssetPath *assetPath = ListGetPointer(gameConfig.assetPaths, i);
-		free(assetPath->path);
-		free(assetPath);
+		free(ListGet(gameConfig.assetPaths, i, AssetPath).path);
 	}
 	ListFree(gameConfig.assetPaths);
 }

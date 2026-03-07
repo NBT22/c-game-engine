@@ -11,9 +11,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
+
+#define __USE_GNU 1 // NOLINT(*-reserved-identifier)
+#define __STDC_WANT_LIB_EXT1__ 1 // NOLINT(*-reserved-identifier)
+#include <stdlib.h>
 
 void _ListInit(List *list, const size_t stride)
 {
@@ -32,7 +35,7 @@ void _LockingListInit(LockingList *list, const size_t stride)
 	list->mutex = SDL_CreateMutex();
 }
 
-void _SortedListInit(SortedList *list, const size_t stride, int (*const CompareFunction)(const void *, const void *))
+void _SortedListInit(SortedList *list, const size_t stride, SortedListCompareFunction CompareFunction)
 {
 	assert(list);
 
@@ -93,13 +96,18 @@ void _LockingListAdd(LockingList *list, const void *data)
 	ListUnlock(*list);
 }
 
+int CompareFunction(const void *a, const void *b, void *function)
+{
+	return ((SortedListCompareFunction)function)(*(const void **)a, *(const void **)b);
+}
+
 void _SortedListAdd(SortedList *list, const void *data)
 {
 	assert(list);
 
 	// TODO: Fast insert logic
 	_ListAdd((List *)list, data);
-	qsort(list->data, list->length, list->stride, list->CompareFunction);
+	qsort_r(list->data, list->length, list->stride, CompareFunction, list->CompareFunction);
 }
 
 
@@ -204,7 +212,7 @@ size_t _ListFind(const List *list, const void *data)
 {
 	if (!list->length)
 	{
-		return -1;
+		return SIZE_MAX;
 	}
 
 	for (size_t i = 0; i < list->length; i++)
@@ -214,14 +222,14 @@ size_t _ListFind(const List *list, const void *data)
 			return i;
 		}
 	}
-	return -1;
+	return SIZE_MAX;
 }
 
 size_t _LockingListFind(LockingList *list, const void *data)
 {
 	if (!list->length)
 	{
-		return -1;
+		return SIZE_MAX;
 	}
 
 	ListLock(*list);
@@ -235,12 +243,23 @@ size_t _SortedListFind(const SortedList *list, const void *data)
 	assert(list);
 	assert(list->CompareFunction);
 
-	const void *foundElement = bsearch(data, list->data, list->length, list->stride, list->CompareFunction);
-	if (foundElement == NULL)
+	// Binary search
+	size_t offset = 0;
+	size_t length = list->length;
+	while (length > 0)
 	{
-		return -1;
+		const int val = list->CompareFunction(data, ListGet(*list, (length >> 1) + offset, const void *));
+		if (val == 0)
+		{
+			return length >> 1;
+		}
+		if (val > 0)
+		{
+			offset++;
+		}
+		length >>= 1;
 	}
-	return (size_t)((uintptr_t)list->data - (uintptr_t)foundElement);
+	return SIZE_MAX;
 }
 
 
